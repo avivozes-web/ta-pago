@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "target": "ES2022", "useDefineForClassFields": true, "lib": ["ES2022","DOM","DOM.Iterable"],
+    "module": "ESNext", "skipLibCheck": true, "moduleResolution": "bundler", "allowImportingTsExtensions": true,
+    "isolatedModules": true, "noEmit": true, "jsx": "react-jsx", "strict": false, "noImplicitAny": false,
+    "resolveJsonModule": true, "types": ["vite/client", "vite-plugin-pwa/client"]
+  },
+  "include": ["src"], "exclude": ["node_modules","src/**/*.test.ts"]
+}

@@ -1,0 +1,9 @@
+node_modules
+dist
+.DS_Store
+*.local
+.vite
+
+# dados pessoais da Isa (só local)
+supabase/02_seed.sql
+supabase/seed.py
