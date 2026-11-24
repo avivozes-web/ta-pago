@@ -4,7 +4,9 @@ import { useData } from '../data'
 import { Icon } from '../icons'
 import { Mark, Ic, More, editDel, Add, useForm, Sheet, MACRO_LABEL, cycleRng, Empty } from '../ui'
 import { brl } from '../lib/fmt'
-import { cycleName, billCycleKey, billDueFor } from '../lib/cycle'
+import { cycleName, billCycleKey, billDueFor, shiftKey, keyParts, ds } from '../lib/cycle'
+import { ddmm, PAY_LABEL } from '../lib/fmt'
+import { quickList, QUICK_DEFAULT } from '../lib/quick'
 import { norm } from '../lib/parse'
 import { APP_VERSION } from '../lib/pwa'
 import { expectedFor } from '../lib/calc'
@@ -19,6 +21,27 @@ export default function Ajustes() {
   const hh = db!.hh
   const main = db!.cards.find((c: any) => c.is_main) || db!.cards[0]
   const exDue = main ? billDueFor(today, main.closing_day, main.due_day) : null
+  const prevDay = (d: string) => { const t = new Date(d + 'T12:00'); t.setDate(t.getDate() - 1); return t.toLocaleDateString('sv-SE') }
+  const without = (k: string) => { const o = { ...(hh.cycle_starts || {}) }; delete o[k]; return o }
+  const startForm = (k?: string, d?: string) => { const opts = [0, 1, 2].map((n) => shiftKey(currentKey, n)); const kk = k || shiftKey(currentKey, 1)
+    setForm({ title: k ? `Início de ${cycleName(k, naming)}` : 'Começar um mês em outro dia', initial: { k: kk, d: d || today }, fields: [
+      { k: 'k', label: 'Mês', type: 'select', required: true, options: (k ? [k] : opts).map((x) => ({ v: x, l: `${cycleName(x, naming)} ${keyParts(x).y}` })) },
+      { k: 'd', label: 'Começa em', type: 'date', required: true, hint: `O normal é dia ${startDay}. O mês anterior termina na véspera. Faturas do cartão continuam pelo mês do vencimento.` }],
+      onSave: (v) => { const { y, m } = keyParts(v.k); const normal = ds(y, m, startDay); if (v.d === normal) return updHH({ cycle_starts: without(v.k) }); if (v.d <= ds(keyParts(shiftKey(v.k, -1)).y, keyParts(shiftKey(v.k, -1)).m, startDay)) { toast('Data cedo demais'); return false } return updHH({ cycle_starts: { ...without(k || ''), [v.k]: v.d } }) } }) }
+  const quick = quickList(db, 20)
+  const catName = (id: string | null) => db!.categories.find((c: any) => c.id === id)?.name
+  const pinnedRaw = (): any[] => (Array.isArray(hh.quick_buttons) ? hh.quick_buttons : QUICK_DEFAULT)
+  const pin = (q: any) => updHH({ quick_buttons: [...pinnedRaw(), { label: q.label, description: q.description, category_id: q.category_id, payment: q.payment, card_id: q.card_id }] })
+  const unpin = (q: any) => { if (confirm(`Tirar o atalho "${q.label}"?`)) updHH({ quick_buttons: pinnedRaw().filter((b) => b.label !== q.label), quick_hidden: [...(hh.quick_hidden || []), q.description] }) }
+  const quickForm = (q?: any) => { const raw = q ? pinnedRaw().find((b) => b.label === q.label) || q : {}
+    setForm({ title: q ? `Atalho · ${q.label}` : 'Novo atalho', initial: { label: raw.label || '', description: raw.description || '', category_id: raw.category_id || q?.category_id || '', payment: raw.payment || '', card_id: raw.card_id || '' }, fields: [
+      { k: 'label', label: 'Nome no botão', type: 'text', required: true }, { k: 'description', label: 'Descrição no extrato', type: 'text', hint: 'Vazio = igual ao nome' },
+      { k: 'category_id', label: 'Categoria', type: 'select', options: db!.categories.map((c: any) => ({ v: c.id, l: c.name })) },
+      { k: 'payment', label: 'Pagamento', type: 'ops', options: [{ v: '', l: 'Perguntar' }, ...['dinheiro', 'pix', 'debito', 'credito'].map((v) => ({ v, l: PAY_LABEL[v] }))] },
+      { k: 'card_id', label: 'Cartão', type: 'select', options: db!.cards.map((c: any) => ({ v: c.id, l: c.name })) }],
+      show: (v) => ({ card_id: v.payment === 'credito' }),
+      onSave: (v) => { const row = { label: v.label, description: v.description || v.label, category_id: v.category_id || null, payment: v.payment || null, card_id: v.payment === 'credito' ? v.card_id || null : null }
+        const list = pinnedRaw(); return updHH({ quick_buttons: q ? list.map((b) => (b.label === q.label ? row : b)) : [...list, row] }) } }) }
   const incForm = (s?: any) => setForm({ title: s ? 'Editar entrada' : 'Nova entrada recorrente', initial: s ? { ...s, expected_amount: Number(s.expected_amount) } : { is_salary: false }, fields: [
     { k: 'name', label: 'Nome', type: 'text', required: true },
     { k: 'is_salary', label: 'Salário recorrente', type: 'toggle', hint: 'Entra sozinho todo mês no dia do salário' },
@@ -56,6 +79,24 @@ export default function Ajustes() {
         <div className="li" style={{ display: 'block' }}><div className="t" style={{ marginBottom: 8 }}>Nome do ciclo</div>
           <div style={{ display: 'flex', background: '#ECEAE5', borderRadius: 9, padding: 3, fontSize: 12 }}>{(['end', 'start'] as const).map((n) => <button type="button" key={n} onClick={() => updHH({ cycle_naming: n })} style={{ flex: 1, textAlign: 'center', padding: 6, ...(naming === n ? { background: '#fff', borderRadius: 7, fontWeight: 600, boxShadow: '0 1px 2px rgba(0,0,0,.08)' } : { color: 'var(--mut)' }) }}>{n === 'end' ? 'Mês em que termina' : 'Mês em que começa'}</button>)}</div>
           <div className="lbl n" style={{ marginTop: 7 }}>{cycleRng(currentKey, startDay)} = <b style={{ color: 'var(--ink)' }}>{cycleName(currentKey, naming)}</b>{exDue && <> · a fatura que vence {exDue.slice(8)}/{exDue.slice(5, 7)} entra em {cycleName(billCycleKey(exDue, naming), naming)}</>}</div></div>
+      </div>
+      <div className="sec">Mês que começou antes</div>
+      <div className="card" style={{ padding: '2px 14px' }}>
+        {Object.entries(hh.cycle_starts || {}).sort().map(([k, d]: any) => <div key={k} className="li tap" onClick={() => startForm(k, d)}><Ic n="cal" /><div><div className="t">{cycleName(k, naming)} {keyParts(k).y} começou em {ddmm(d)}</div><div className="d">{cycleName(shiftKey(k, -1), naming)} terminou em {ddmm(prevDay(d))} · o normal seria dia {startDay}</div></div><More items={editDel(() => startForm(k, d), async () => { if (confirm(`Voltar ${cycleName(k, naming)} para o dia ${startDay}?`)) await updHH({ cycle_starts: without(k) }) })} /></div>)}
+        {!Object.keys(hh.cycle_starts || {}).length && <div className="lbl" style={{ padding: '10px 0 2px' }}>Quando o salário cai antes do dia {startDay} e você marca "Recebi antes", o app pergunta se o mês novo começa naquele dia. Fica guardado aqui.</div>}
+        <Add label="Começar um mês em outro dia" onClick={() => startForm()} /><div style={{ height: 8 }} />
+      </div>
+      <div className="sec">Atalhos de gastos</div>
+      <div className="card" style={{ padding: '2px 14px' }}>
+        {quick.map((q) => <div key={q.label} className="li tap" onClick={() => q.pinned ? quickForm(q) : pin(q)}><Ic n="bolt" /><div style={{ minWidth: 0, flex: 1 }}><div className="t">{q.label}</div><div className="d">{[catName(q.category_id), q.payment ? PAY_LABEL[q.payment] : 'pergunta o pagamento', q.count ? `usado ${q.count}x` : null].filter(Boolean).join(' · ')}</div></div>
+          {q.pinned ? <span className="tag">fixado</span> : <span className="tag acc">do histórico</span>}
+          <More items={q.pinned ? editDel(() => quickForm(q), () => unpin(q)) : [{ label: 'Fixar', icon: 'check', onClick: () => pin(q) }, { label: 'Esconder', icon: 'x', neg: true, onClick: () => updHH({ quick_hidden: [...(hh.quick_hidden || []), q.description] }) }]} /></div>)}
+        <Add label="Novo atalho" onClick={() => quickForm()} />
+        <div className="lbl" style={{ padding: '2px 0 10px' }}>Aparecem no Início. Os mais usados vêm primeiro; o app também sugere os gastos que mais se repetem.</div>
+      </div>
+      <div className="sec">Lembrete da noite</div>
+      <div className="card" style={{ padding: '2px 14px' }}>
+        <div className="li tap" onClick={() => setForm({ title: 'Lembrete da noite', initial: { h: hh.reminder_hour ?? '19:00' }, fields: [{ k: 'h', label: 'Aparecer a partir de', type: 'select', options: ['17:00', '18:00', '19:00', '20:00', '21:00', '22:00'].map((v) => ({ v, l: v })), hint: 'Vazio = desligado' }], onSave: (v) => updHH({ reminder_hour: v.h || '' }) })}><Ic n="moon" /><div><div className="t">"Lançou os gastos de hoje?"</div><div className="d">cartão no Início · some quando você lança ou dispensa</div></div><span className="sp lbl n" style={{ color: 'var(--ink2)' }}>{hh.reminder_hour ? `às ${hh.reminder_hour}` : 'desligado'}</span><span style={{ color: 'var(--mut2)' }}><Icon n="right" s={16} /></span></div>
       </div>
       <div className="sec">Entradas recorrentes</div>
       <div className="card" style={{ padding: '2px 14px' }}>

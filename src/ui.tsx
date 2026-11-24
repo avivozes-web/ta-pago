@@ -53,8 +53,8 @@ export type Field =
   | { k: string; label: string; type: 'days'; hint?: string }
   | { k: string; label: string; type: 'ops'; options: { v: any; l: string }[]; hint?: string }
 
-export interface FormProps { title: string; fields: (Field | false | null | undefined)[]; initial: Record<string, any>; onSave: (v: Record<string, any>) => Promise<boolean | void> | boolean | void; onDelete?: () => Promise<any> | void; onClose: () => void; saveLabel?: string; show?: (v: Record<string, any>) => Record<string, boolean>; children?: ReactNode }
-export function FormSheet({ title, fields, initial, onSave, onDelete, onClose, saveLabel, show, children }: FormProps) {
+export interface FormProps { title: string; fields: (Field | false | null | undefined)[]; initial: Record<string, any>; onSave: (v: Record<string, any>) => Promise<boolean | void> | boolean | void; onDelete?: () => Promise<any> | void; onClose: () => void; saveLabel?: string; cancelLabel?: string; show?: (v: Record<string, any>) => Record<string, boolean>; children?: ReactNode }
+export function FormSheet({ title, fields, initial, onSave, onDelete, onClose, saveLabel, cancelLabel, show, children }: FormProps) {
   const fs = fields.filter(Boolean) as Field[]
   const [v, setV] = useState<Record<string, any>>(() => { const o: any = { ...initial }; fs.forEach((f) => { if ((f.type === 'money') && typeof o[f.k] === 'number') o[f.k] = moneyOut(o[f.k]); if (f.type === 'money' && o[f.k] == null) o[f.k] = '' }); return o })
   const [err, setErr] = useState<string | null>(null); const [busy, setBusy] = useState(false)
@@ -99,6 +99,7 @@ export function FormSheet({ title, fields, initial, onSave, onDelete, onClose, s
     {err && <div className="note neg"><Icon n="alert" /><div className="d">{err}</div></div>}
     <div className="row2" style={{ marginTop: 6 }}>
       {onDelete && <button type="button" className="btn neg" style={{ flex: '0 0 auto', padding: '12px 16px' }} onClick={async () => { if (ask('Apagar? Não dá para desfazer.')) { await onDelete(); onClose() } }}><Icon n="trash" /></button>}
+      {cancelLabel && <button type="button" className="btn l" onClick={onClose}>{cancelLabel}</button>}
       <button type="button" className="btn" disabled={busy} onClick={save}>{busy ? 'Salvando…' : saveLabel || 'Salvar'}</button>
     </div>
   </Sheet>
@@ -127,8 +128,9 @@ export function Header() {
     <button type="button" className="cyc" onClick={() => setOpen(!open)} aria-label="trocar ciclo">
       <div><div className="a">{cycleName(key, naming)}{yr(key)}</div><div className="b n">{cycleRng(key, startDay)}</div></div><Icon n="down" />
     </button>
+    <button type="button" className="ib" aria-label="falar" title="Falar (áudio)" style={{ background: 'var(--ink)', color: '#fff', borderColor: 'var(--ink)' }} onClick={() => window.dispatchEvent(new CustomEvent('tp:open', { detail: { voz: true } }))}><Icon n="mic" /></button>
     <button type="button" className="ib" aria-label="ajustes" onClick={() => nav('/ajustes')}><Icon n="gear" /></button>
-    {open && <><div style={{ position: 'fixed', inset: 0, zIndex: 25 }} onClick={() => setOpen(false)} /><div className="cycsel" style={{ right: 58 }}>
+    {open && <><div style={{ position: 'fixed', inset: 0, zIndex: 25 }} onClick={() => setOpen(false)} /><div className="cycsel" style={{ right: 100 }}>
       {keys.map((k) => <button type="button" key={k} className={k === key ? 'on' : ''} onClick={() => { setKey(k); setOpen(false) }}>
         <div className="row"><span>{cycleName(k, naming)}{yr(k)}</span><span className="sp lbl">{k === currentKey ? 'atual' : k < currentKey ? 'arquivado' : 'futuro'}</span></div>
         <div className="lbl n">{cycleRng(k, startDay)}</div></button>)}

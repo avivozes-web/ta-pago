@@ -7,3 +7,4 @@ dist
 # dados pessoais da Isa (só local)
 supabase/02_seed.sql
 supabase/seed.py
+dist-test

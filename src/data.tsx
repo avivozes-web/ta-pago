@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { sb } from './lib/sb'
-import { cycleKeyOf, todayStr, addDays, type Naming } from './lib/cycle'
+import { cycleKeyOf, todayStr, addDays, setCycleStarts, type Naming } from './lib/cycle'
 
 export const TABLES = {
   categories: 'tp_categories', keywords: 'tp_keywords', cards: 'tp_cards', income: 'tp_income_sources', investGoals: 'tp_invest_goals',
@@ -84,6 +84,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const startDay = db?.hh?.cycle_start_day ?? 15
   const naming: Naming = db?.hh?.cycle_naming ?? 'start'
+  setCycleStarts(db?.hh?.cycle_starts)
   const currentKey = cycleKeyOf(today, startDay)
   const value: Ctx = { db, loading, error, today, currentKey, key: keySel || currentKey, setKey: setKeySel, naming, startDay, reload, ins, upd, del, updHH, toast, msg }
   return <C.Provider value={value}>{children}</C.Provider>

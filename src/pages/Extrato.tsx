@@ -5,7 +5,7 @@ import { Icon } from '../icons'
 import { Header, CycleBanner, Seg, DIN, Ic, More, editDel, catIcon, Empty, ask, useForm } from '../ui'
 import { cycleData } from '../lib/calc'
 import { brl, ddmm, DOW, PAY_LABEL } from '../lib/fmt'
-import { cycleName, dow, addDays } from '../lib/cycle'
+import { cycleName, dow, addDays, shiftKey, cycleRange } from '../lib/cycle'
 import { norm } from '../lib/parse'
 import { Lancar, TxEdit, type LancarInit, salaryValueForm, salaryReceivedForm } from '../lancar'
 import { sb } from '../lib/sb'
@@ -42,6 +42,9 @@ export default function Extrato() {
   const nOut = cd.txs.filter((t: any) => t.kind === 'saida').length + cd.paid.length + cd.manual.length
   const sal = cd.incomeRows.filter((r: any) => r.source.is_salary)
   const others = cd.incomeRows.filter((r: any) => !r.source.is_salary)
+  // Salário do PRÓXIMO mês que pode chegar antes do dia de início
+  const nk = shiftKey(key, 1)
+  const nextSal = key === currentKey ? cycleData(db, nk, today).incomeRows.filter((r: any) => r.source.is_salary && r.expected > 0 && !r.real.length) : []
   return <>
     <Header /><div className="ttl">Dinheiro</div><Seg items={DIN} /><CycleBanner />
     <div className="wrap">
@@ -63,6 +66,9 @@ export default function Extrato() {
             <button type="button" className="tag" onClick={() => setLanc({ mode: 'entrada', sourceId: r.source.id, advance: true })}>Adiantar</button></div>
           </div>
         </div> })}
+        {nextSal.length > 0 && <div className="li" style={{ display: 'block' }}><div className="t">Salário de {cycleName(nk, naming)} chegou antes do dia {cycleRange(nk, startDay).start.slice(8)}?</div>
+          <div className="d">Marque aqui. O app pergunta se o mês novo começa nesse dia.</div>
+          <div className="row" style={{ gap: 6, marginTop: 8, flexWrap: 'wrap' }}>{nextSal.map((r: any) => <button type="button" key={r.source.id} className="tag acc" style={{ padding: '6px 10px', fontSize: 12 }} onClick={() => salaryReceivedForm(ctx, r, nk, setForm)}><Icon n="check" /> {r.source.name}: recebi antes</button>)}</div></div>}
         {others.length > 0 && <div className="li"><div style={{ minWidth: 0, flex: 1 }}><div className="t">Outras entradas</div><div className="d">{others.map((r: any) => r.source.name).join(', ')} · você lança quando entrar</div></div><button type="button" className="sp tag acc" onClick={() => setLanc({ mode: 'entrada' })}><Icon n="plus" /> Lançar</button></div>}
       </div>
       <div className="row" style={{ gap: 8, marginBottom: 8 }}><label className="inp" style={{ flex: 1 }}><Icon n="search" /><input style={{ border: 0, outline: 0, flex: 1, background: 'transparent', fontSize: 13 }} placeholder="Buscar" value={q} onChange={(e) => setQ(e.target.value)} /></label>

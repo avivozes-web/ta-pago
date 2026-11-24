@@ -3,7 +3,8 @@ import { useData } from './data'
 import { Icon } from './icons'
 import { Sheet, FormSheet, MACRO_LABEL, type Field } from './ui'
 import { parseEntry, guessCategory, learnWord, norm, type Pay } from './lib/parse'
-import { installmentDues, splitInstallments, cycleName, billCycleKey, addDays, todayStr } from './lib/cycle'
+import { installmentDues, splitInstallments, cycleName, billCycleKey, addDays, todayStr, shiftKey, cycleRange, keyParts, ds } from './lib/cycle'
+const defaultStart = (key: string, startDay: number) => { const { y, m } = keyParts(key); return ds(y, m, startDay) }
 import { brl, ddmm, moneyIn, moneyOut, PAY_LABEL } from './lib/fmt'
 import { sb } from './lib/sb'
 import { txCycleKey } from './lib/calc'
@@ -18,16 +19,20 @@ export async function learn(ctx: any, description: string, categoryId: string | 
 function uuid() { return (crypto as any).randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => { const r = (Math.random() * 16) | 0; return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16) }) }
 
 function Row({ k, children }: { k: string; children: any }) { return <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderTop: '1px solid var(--line2)' }}><span style={{ width: 80, color: 'var(--mut)', fontSize: 12, flex: 'none' }}>{k}</span><div style={{ flex: 1, minWidth: 0 }}>{children}</div></div> }
-export interface LancarInit { mode?: 'saida' | 'entrada'; sourceId?: string; amount?: number; advance?: boolean; text?: string }
+export interface LancarInit { mode?: 'saida' | 'entrada'; sourceId?: string; amount?: number; advance?: boolean; text?: string; quick?: { label: string; description: string; category_id: string | null; payment: string | null; card_id: string | null } }
+/** Abre o lançamento (+) ou o áudio de qualquer tela. */
+export const openLancar = (init?: LancarInit) => window.dispatchEvent(new CustomEvent('tp:open', { detail: { lancar: init || {} } }))
+export const openVoz = () => window.dispatchEvent(new CustomEvent('tp:open', { detail: { voz: true } }))
 export function Lancar({ onClose, init }: { onClose: () => void; init?: LancarInit }) {
   const ctx = useData(); const { db, today, naming, startDay, ins, toast } = ctx
   const [mode, setMode] = useState<'saida' | 'entrada'>(init?.mode || 'saida')
   const [text, setText] = useState(init?.text || '')
-  const [ov, setOv] = useState<Record<string, any>>(() => init?.mode === 'entrada' ? { sourceId: init.sourceId || '', amount: init.amount != null ? moneyOut(init.amount) : undefined, advance: !!init.advance } : {})
+  const [ov, setOv] = useState<Record<string, any>>(() => init?.mode === 'entrada' ? { sourceId: init.sourceId || '', amount: init.amount != null ? moneyOut(init.amount) : undefined, advance: !!init.advance } : init?.quick ? { description: init.quick.description, categoryId: init.quick.category_id || '', ...(init.quick.payment ? { payment: init.quick.payment } : {}), ...(init.quick.card_id ? { cardId: init.quick.card_id } : {}) } : {})
   const [busy, setBusy] = useState(false)
   const cards = db!.cards
   const p = useMemo(() => parseEntry(text, cards.map((c: any) => ({ id: c.id, name: c.name, aliases: c.aliases || '' })), today), [text, cards, today])
-  const guess = useMemo(() => (p.description ? guessCategory(p.description, db!.keywords) : null), [p.description, db])
+  const descForGuess = ov.description ?? p.description
+  const guess = useMemo(() => (descForGuess ? guessCategory(descForGuess, db!.keywords) : null), [descForGuess, db])
   const srcGuess = useMemo(() => { const n = norm(p.description); if (!n) return null; return db!.income.find((s: any) => [s.name, ...(s.aliases || '').split(',')].map(norm).filter(Boolean).some((a: string) => n.includes(a) || a.includes(n))) || null }, [p.description, db])
   const set = (k: string, v: any) => setOv((o) => ({ ...o, [k]: v }))
   const description = ov.description ?? p.description
@@ -71,17 +76,19 @@ export function Lancar({ onClose, init }: { onClose: () => void; init?: LancarIn
     } finally { setBusy(false) }
   }
   const inp = { className: 'fi', style: { padding: '7px 9px', fontSize: 13 } }
-  return <Sheet title={mode === 'saida' ? 'Novo gasto' : 'Nova entrada'} onClose={onClose} right={
+  return <Sheet title={init?.quick ? init.quick.label : mode === 'saida' ? 'Novo gasto' : 'Nova entrada'} onClose={onClose} right={
     <div style={{ display: 'flex', background: '#ECEAE5', borderRadius: 9, padding: 3, fontSize: 12, fontWeight: 500 }}>
       {(['saida', 'entrada'] as const).map((m) => <button type="button" key={m} onClick={() => setMode(m)} style={m === mode ? { background: '#fff', padding: '4px 12px', borderRadius: 7, fontWeight: 600, boxShadow: '0 1px 2px rgba(0,0,0,.08)' } : { padding: '4px 12px', color: 'var(--mut)' }}>{m === 'saida' ? 'Gasto' : 'Entrada'}</button>)}
     </div>}>
-    <input autoFocus={!init?.sourceId} className="fi" style={{ border: '1.5px solid var(--ink)', fontSize: 15, fontWeight: 500, padding: '11px 12px' }} value={text} onChange={(e) => { setText(e.target.value); setOv((o) => { const { description, amount, date, payment, cardId, installments, categoryId, ...rest } = o; return mode === 'entrada' ? { ...rest, categoryId } : rest }) }}
+    {init?.quick && <div className="note acc" style={{ marginBottom: 10 }}><Icon n="bolt" /><div className="d">Atalho: só falta o valor{payment ? '' : ' e a forma de pagamento'}.</div></div>}
+    {!init?.quick && <div className="row" style={{ gap: 8, alignItems: 'stretch' }}><input autoFocus={!init?.sourceId} className="fi" style={{ border: '1.5px solid var(--ink)', fontSize: 15, fontWeight: 500, padding: '11px 12px' }} value={text} onChange={(e) => { setText(e.target.value); setOv((o) => { const { description, amount, date, payment, cardId, installments, categoryId, ...rest } = o; return mode === 'entrada' ? { ...rest, categoryId } : rest }) }}
       placeholder={mode === 'saida' ? 'docinho 2 pix' : 'salário isa 2800'} aria-label="lançamento rápido" onKeyDown={(e) => { if (e.key === 'Enter') save() }} />
-    <div className="lbl" style={{ margin: '6px 2px 10px' }}>{mode === 'saida' ? 'Escreva do seu jeito: "docinho 2 pix", "uber 18 nubank 3x", "mercado 250 bb ontem"' : 'Ex.: "salário isa 2800", "reboque 650 pix"'}</div>
+      <button type="button" className="ib" aria-label="falar" title="Falar (áudio)" style={{ width: 46, height: 'auto', background: 'var(--ink)', color: '#fff', borderRadius: 12, flex: 'none' }} onClick={() => { onClose(); openVoz() }}><Icon n="mic" /></button></div>}
+    {!init?.quick && <div className="lbl" style={{ margin: '6px 2px 10px' }}>{mode === 'saida' ? 'Escreva do seu jeito: "docinho 2 pix", "uber 18 nubank 3x", "mercado 250 bb ontem"' : 'Ex.: "salário isa 2800", "reboque 650 pix"'}{mode === 'saida' && ' · ou toque no microfone e fale vários de uma vez'}</div>}
     <div className="card" style={{ padding: '4px 14px', marginBottom: 10 }}>
       {mode === 'entrada' && <Row k="De onde"><select {...inp} value={sourceId} onChange={(e) => set('sourceId', e.target.value)}><option value="">Outra entrada</option>{db!.income.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></Row>}
       <Row k="Descrição"><input {...inp} value={description} placeholder={mode === 'entrada' ? source?.name || 'Ex.: Venda' : 'Ex.: Docinho'} onChange={(e) => set('description', e.target.value)} /></Row>
-      <Row k="Valor"><div className="row" style={{ gap: 6 }}><input {...inp} inputMode="decimal" value={amountStr} placeholder="0,00" onChange={(e) => set('amount', e.target.value)} />{payment === 'credito' && installments > 1 && amount ? <span className="tag n">{installments}x de {brl(parts[parts.length - 1])}</span> : null}</div></Row>
+      <Row k="Valor"><div className="row" style={{ gap: 6 }}><input {...inp} autoFocus={!!init?.quick} aria-label="valor" inputMode="decimal" value={amountStr} placeholder="0,00" onChange={(e) => set('amount', e.target.value)} />{payment === 'credito' && installments > 1 && amount ? <span className="tag n">{installments}x de {brl(parts[parts.length - 1])}</span> : null}</div></Row>
       {mode === 'saida' && <Row k="Categoria"><select {...inp} value={categoryId} onChange={(e) => set('categoryId', e.target.value)}><option value="">Escolha…</option>{db!.categories.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
         <div className="row" style={{ gap: 5, marginTop: 4, flexWrap: 'wrap' }}>{cat && <span className="tag">{MACRO_LABEL[cat.macro]}</span>}{guess && guess.category_id === categoryId && <span className="tag acc"><Icon n="check" /> palavra {guess.learned ? 'aprendida' : 'conhecida'}: "{guess.word}"</span>}{categoryId && (!guess || guess.category_id !== categoryId) && description && <span className="tag">vou aprender "{learnWord(description)}"</span>}</div></Row>}
       <Row k="Data"><input {...inp} type="date" value={date} onChange={(e) => set('date', e.target.value)} /></Row>
@@ -167,6 +174,23 @@ export function salaryReceivedForm(ctx: any, row: any, key: string, setForm: (f:
   const real = row.real?.[0]
   setForm({ title: `${row.source.name} · ${cycleName(key, naming)}`, initial: { date: real?.date || today, amount: real ? Number(real.amount) : row.net },
     fields: [{ k: 'date', label: 'Recebi em', type: 'date', required: true }, { k: 'amount', label: 'Valor recebido', type: 'money', required: true, positive: true, hint: row.adv > 0 ? `Já descontado o adiantamento de ${brl(row.adv)}.` : undefined }],
-    onSave: async (v: any) => real ? upd('tx', real.id, { date: v.date, amount: v.amount }) : !!(await ins('tx', { kind: 'entrada', description: row.source.name, amount: v.amount, date: v.date, payment: 'pix', income_source_id: row.source.id, is_advance: false, for_cycle: key })),
+    onSave: async (v: any) => {
+      const ok = real ? await upd('tx', real.id, { date: v.date, amount: v.amount }) : !!(await ins('tx', { kind: 'entrada', description: row.source.name, amount: v.amount, date: v.date, payment: 'pix', income_source_id: row.source.id, is_advance: false, for_cycle: key }))
+      if (ok) maybeStartEarly(ctx, key, v.date, setForm)
+      return ok
+    },
     onDelete: real ? () => del('tx', real.id) : undefined })
+}
+/** Recebeu antes do dia de início? Pergunta se o mês novo começa nesse dia (o ciclo atual termina na véspera). */
+export function maybeStartEarly(ctx: any, key: string, date: string, setForm: (f: any) => void) {
+  const { db, naming, startDay, today, updHH, toast } = ctx
+  const starts = { ...(db.hh.cycle_starts || {}) }
+  const normal = defaultStart(key, startDay)
+  if (date >= normal || starts[key] === date) return
+  const prev = shiftKey(key, -1)
+  if (date <= cycleRange(prev, startDay).start) return
+  const quando = date === today ? 'hoje' : `em ${ddmm(date)}`
+  setTimeout(() => setForm({ title: `Começar o mês novo ${quando}?`, initial: {}, fields: [], saveLabel: `Sim, começar ${cycleName(key, naming)}`, cancelLabel: 'Não',
+    children: <div className="note acc" style={{ marginBottom: 12 }}><Icon n="cal" /><div><div className="t">{cycleName(key, naming)} começa {date === today ? 'hoje' : 'em'} {ddmm(date)}</div><div className="d">{cycleName(prev, naming)} termina em {ddmm(addDays(date, -1))}. Os gastos a partir de {ddmm(date)} vão para {cycleName(key, naming)}. As faturas do cartão continuam pelo mês do vencimento. Dá para mudar depois em Ajustes.</div></div></div>,
+    onSave: async () => { const ok = await updHH({ cycle_starts: { ...starts, [key]: date } }); if (ok) toast(`${cycleName(key, naming)} começou em ${ddmm(date)}`); return ok } }), 0)
 }

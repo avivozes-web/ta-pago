@@ -27,7 +27,7 @@ export default defineConfig({
       workbox: {
         navigateFallback: '/ta-pago/index.html',
         globPatterns: ['**/*.{js,css,html,png,svg,ttf,woff2}'],
-        cacheId: 'tapago-v3', cleanupOutdatedCaches: true, skipWaiting: true, clientsClaim: true,
+        cacheId: 'tapago-v4', cleanupOutdatedCaches: true, skipWaiting: true, clientsClaim: true,
         runtimeCaching: [
           { urlPattern: /^https:\/\/[a-z0-9-]+\.supabase\.co\/.*/i, handler: 'NetworkOnly' },
           { urlPattern: /\/version\.json/, handler: 'NetworkOnly' },
@@ -36,4 +36,6 @@ export default defineConfig({
     }),
   ],
   server: { host: '0.0.0.0', port: 5180 },
+  // Só para testes: o build de teste (VITE_SB_URL=http://localhost:4181) fala com um PostgREST LOCAL, nunca com o banco real.
+  preview: process.env.TP_TEST ? { proxy: { '/rest/v1': { target: 'http://127.0.0.1:54330', changeOrigin: true, rewrite: (p) => p.replace(/^\/rest\/v1/, ''), configure: (proxy) => { proxy.on('proxyReq', (r) => { r.removeHeader('authorization'); r.removeHeader('apikey') }) } } } } : undefined,
 })

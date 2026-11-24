@@ -14,16 +14,25 @@ export function addDays(s: string, n: number) { const { y, m, d } = parts(s); co
 export function diffDays(a: string, b: string) { const A = parts(a), B = parts(b); return Math.round((Date.UTC(B.y, B.m - 1, B.d) - Date.UTC(A.y, A.m - 1, A.d)) / 86400000) }
 export function dow(s: string) { const { y, m, d } = parts(s); return new Date(y, m - 1, d).getDay() }
 
-/** Chave do ciclo = ano-mês em que o ciclo COMEÇA (ex.: 15/11–14/12 → "2026-11"). */
-export function cycleKeyOf(date: string, startDay: number) {
+/** Início real de ciclos que começaram em outro dia (ex.: salário recebido antes do dia 15). {"2026-12":"2026-12-10"} */
+let STARTS: Record<string, string> = {}
+export function setCycleStarts(m: Record<string, string> | null | undefined) { STARTS = m && typeof m === 'object' ? { ...m } : {} }
+export function getCycleStarts() { return STARTS }
+function baseKeyOf(date: string, startDay: number) {
   const { y, m, d } = parts(date)
   if (d >= startDay) return ymKey(y, m)
   const p = addMonthsYM(y, m, -1); return ymKey(p.y, p.m)
 }
+export function cycleStart(key: string, startDay: number) { const { y, m } = keyParts(key); return STARTS[key] || ds(y, m, startDay) }
+/** Chave do ciclo = ano-mês em que o ciclo COMEÇA (ex.: 15/11–14/12 → "2026-11"). Respeita inícios antecipados. */
+export function cycleKeyOf(date: string, startDay: number) {
+  const b = baseKeyOf(date, startDay)
+  for (const k of [shiftKey(b, 1), b, shiftKey(b, -1)]) if (date >= cycleStart(k, startDay)) return k
+  return shiftKey(b, -1)
+}
 export function cycleRange(key: string, startDay: number) {
-  const { y, m } = keyParts(key); const n = addMonthsYM(y, m, 1)
-  const start = ds(y, m, startDay)
-  const end = addDays(ds(n.y, n.m, startDay), -1)
+  const start = cycleStart(key, startDay)
+  const end = addDays(cycleStart(shiftKey(key, 1), startDay), -1)
   return { start, end }
 }
 /** Nome do ciclo. 'start' = mês em que começa (escolha da Isa). */

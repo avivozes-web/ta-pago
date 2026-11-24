@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test": "node --experimental-strip-types --test src/lib/cycle.test.ts src/lib/parse.test.ts"
+    "test": "node --experimental-strip-types --test src/lib/cycle.test.ts src/lib/parse.test.ts src/lib/voice.test.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.81.1",

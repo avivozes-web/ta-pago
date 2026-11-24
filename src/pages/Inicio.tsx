@@ -6,7 +6,8 @@ import { Header, CycleBanner, Ic, Bar, catIcon, MACRO_COLOR, Empty } from '../ui
 import { cycleData, billsDueSoon, paceSeries, cashFlow, nextSummary } from '../lib/calc'
 import { brl, ddmm, PAY_LABEL } from '../lib/fmt'
 import { cycleName, shiftKey, diffDays, ds, parts, monthLen, addDays } from '../lib/cycle'
-import { TxEdit } from '../lancar'
+import { TxEdit, openLancar, openVoz } from '../lancar'
+import { quickList } from '../lib/quick'
 
 export function alertsFor(db: any, cd: any) {
   const out: { lvl: 'neg' | 'warn'; t: string; d: string; to: string }[] = []
@@ -87,6 +88,8 @@ export default function Inicio() {
   return <>
     <Header /><CycleBanner />
     <div className="wrap">
+      {key === currentKey && <Noite />}
+      {key === currentKey && <Atalhos />}
       {soon.map((b) => { const n = diffDays(today, b.due); return <div key={b.card.id + b.due} className={'note ' + (n === 0 ? 'neg' : 'warn')}><Icon n="bell" /><div><div className="t">{n === 0 ? `Fatura ${b.card.name} vence HOJE` : `Fatura ${b.card.name} vence em ${n} dia${n > 1 ? 's' : ''} (${ddmm(b.due)})`}</div><div className="d n">{brl(b.amount)} · entra no ciclo {cycleName(b.due.slice(0, 7), naming)}</div></div></div> })}
       <div className="card" style={{ background: 'var(--ink)', borderColor: 'var(--ink)', color: '#fff', padding: 16 }}>
         <div className="row"><span className="cap" style={{ color: 'rgba(255,255,255,.55)' }}>{cd.cap > 0 ? 'Livre para gastar' : 'Saldo do ciclo'}</span><span className="sp tag n" style={{ background: 'rgba(255,255,255,.1)', color: 'rgba(255,255,255,.8)' }}>{cd.isCurrent ? `dia ${cd.dayN} de ${cd.daysTotal}` : key < currentKey ? 'fechado' : 'ainda não começou'}</span></div>
@@ -120,4 +123,41 @@ export default function Inicio() {
     {edit && <TxEdit t={edit} onClose={() => setEdit(null)} />}
     {void startDay}
   </>
+}
+
+/** Hora "agora" (aceita ?agora=20:00 para teste). */
+function nowHM() { try { const p = new URLSearchParams(location.hash.split('?')[1] || location.search).get('agora'); if (p && /^\d{2}:\d{2}$/.test(p)) return p } catch { /* */ } const d = new Date(); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}` }
+const NOITE_KEY = 'tp_noite_ok'
+/** Lembrete da noite: aparece a partir da hora escolhida, some depois de lançar ou dispensar no dia. */
+function Noite() {
+  const { db, today, toast } = useData()
+  const [, force] = useState(0)
+  const hour = db!.hh.reminder_hour ?? '19:00'
+  if (!hour || nowHM() < hour) return null
+  try { if (localStorage.getItem(NOITE_KEY) === today) return null } catch { /* */ }
+  const loc = (t: any) => (t.created_at ? new Date(t.created_at).toLocaleDateString('sv-SE') : '')
+  if (db!.tx.some((t: any) => t.kind === 'saida' && (t.date === today || loc(t) === today))) return null
+  const dismiss = (m?: string) => { try { localStorage.setItem(NOITE_KEY, today) } catch { /* */ } if (m) toast(m); force((x) => x + 1) }
+  return <div className="card noite" style={{ background: 'var(--ink)', borderColor: 'var(--ink)', color: '#fff', padding: 14 }}>
+    <div className="row" style={{ gap: 10 }}><span style={{ width: 34, height: 34, borderRadius: 10, background: 'rgba(255,255,255,.1)', display: 'grid', placeItems: 'center', flex: 'none' }}><Icon n="moon" /></span>
+      <div style={{ flex: 1 }}><div style={{ fontWeight: 650, fontSize: 15 }}>Lançou os gastos de hoje?</div><div style={{ fontSize: 12, color: 'rgba(255,255,255,.6)' }}>Leva 1 minuto. Pode falar tudo de uma vez.</div></div>
+      <button type="button" aria-label="dispensar" style={{ color: 'rgba(255,255,255,.5)', display: 'grid' }} onClick={() => dismiss()}><Icon n="x" s={16} /></button></div>
+    <div className="row" style={{ gap: 6, marginTop: 12 }}>
+      <button type="button" className="btn" style={{ flex: 1, padding: 10, fontSize: 13, background: '#3FD1A9', color: 'var(--ink)' }} onClick={() => openVoz()}><Icon n="mic" /> Áudio</button>
+      <button type="button" className="btn" style={{ flex: '0 0 auto', padding: '10px 16px', fontSize: 13, background: 'rgba(255,255,255,.12)' }} aria-label="lançar com +" onClick={() => openLancar()}><Icon n="plus" /></button>
+      <button type="button" className="btn" style={{ flex: 1, padding: 10, fontSize: 12.5, background: 'rgba(255,255,255,.12)' }} onClick={() => dismiss('Anotado: hoje sem gastos')}>Hoje não gastei</button>
+    </div>
+  </div>
+}
+/** Fileira de atalhos: os gastos que mais se repetem (e os fixados em Ajustes). */
+function Atalhos() {
+  const { db } = useData(); const nav = useNavigate()
+  const list = useMemo(() => quickList(db), [db])
+  if (!list.length) return null
+  return <div className="atalhos" style={{ margin: '0 -16px 12px', padding: '0 16px', overflowX: 'auto', display: 'flex', gap: 6, scrollbarWidth: 'none' }}>
+    {list.map((q) => { const c = db!.categories.find((x: any) => x.id === q.category_id)
+      return <button type="button" key={q.label} className="qk" onClick={() => openLancar({ quick: q })} style={{ flex: 'none', display: 'flex', alignItems: 'center', gap: 6, background: '#fff', border: '1px solid var(--line)', borderRadius: 12, padding: '8px 11px 8px 8px', fontSize: 13, fontWeight: 550, whiteSpace: 'nowrap' }}>
+        <span style={{ width: 24, height: 24, borderRadius: 7, background: '#F1EFEB', display: 'grid', placeItems: 'center' }}><Icon n={catIcon(c?.name || q.label)} s={14} /></span>{q.label}</button> })}
+    <button type="button" aria-label="editar atalhos" onClick={() => nav('/ajustes')} style={{ flex: 'none', border: '1px dashed var(--line)', borderRadius: 12, padding: '8px 11px', color: 'var(--mut)', display: 'grid', placeItems: 'center' }}><Icon n="edit" s={14} /></button>
+  </div>
 }
