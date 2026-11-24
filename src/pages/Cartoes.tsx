@@ -90,7 +90,7 @@ export default function Cartoes() {
           const r = await ins('tx', { kind: 'saida', description: o.name, amount: used, date: today, payment: 'pix', category_id: cat?.id || null })
           if (r) { await upd('overdraft', o.id, { used_amount: 0, pay_date: null }); toast('Cheque especial zerado') } }
         return <div key={o.id} className="card tap" onClick={odForm}>
-          <div className="ch"><Ic n="alert" /><div style={{ marginLeft: 10 }}><h3>{o.name}</h3><div className="lbl n">limite {brl(lim, false)} · {used ? `pagar em ${ddmm(pd)} (ciclo ${cycleName(cycleKeyOf(pd, startDay), naming)})` : 'nada usado'}</div></div><b className="sp n" style={{ fontSize: 16, color: used ? 'var(--neg)' : undefined }}>{brl(used)}</b></div>
+          <div className="ch"><Ic n="alert" /><div style={{ marginLeft: 10 }}><h3>{o.name}</h3><div className="lbl n">limite {brl(lim, false)} · {used ? `pagar em ${ddmm(pd)} (ciclo ${cycleName(cycleKeyOf(pd, startDay), naming)})` : 'nada usado'}</div></div><b className="sp n" style={{ fontSize: 16, whiteSpace: 'nowrap', color: used ? 'var(--neg)' : undefined }}>{brl(used)}</b></div>
           <Bar thin pct={lim ? (used / lim) * 100 : 0} color={used ? 'var(--neg)' : undefined} />
           <div className="row" style={{ gap: 6, marginTop: 10 }} onClick={(e) => e.stopPropagation()}>
             <button type="button" className="btn l" style={{ flex: 1, padding: 9, fontSize: 12.5 }} onClick={odForm}><Icon n="edit" /> Usei / mudar valor</button>
