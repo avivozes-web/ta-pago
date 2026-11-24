@@ -6,7 +6,6 @@ import { Mark, Ic, More, editDel, Add, useForm, Sheet, MACRO_LABEL, cycleRng, Em
 import { brl } from '../lib/fmt'
 import { cycleName, billCycleKey, billDueFor } from '../lib/cycle'
 import { norm } from '../lib/parse'
-import { sb } from '../lib/sb'
 import { APP_VERSION } from '../lib/pwa'
 
 function Sr({ icon, t, d, v, onClick }: { icon: string; t: string; d?: string; v?: any; onClick: () => void }) {
@@ -14,7 +13,7 @@ function Sr({ icon, t, d, v, onClick }: { icon: string; t: string; d?: string; v
 }
 export default function Ajustes() {
   const { db, currentKey, naming, startDay, today, ins, upd, del, updHH, toast } = useData(); const nav = useNavigate()
-  const [form, setForm] = useForm(); const [panel, setPanel] = useState<null | 'cats' | 'words' | 'people'>(null); const [wq, setWq] = useState('')
+  const [form, setForm] = useForm(); const [panel, setPanel] = useState<null | 'cats' | 'words'>(null); const [wq, setWq] = useState('')
   const hh = db!.hh
   const main = db!.cards.find((c: any) => c.is_main) || db!.cards[0]
   const exDue = main ? billDueFor(today, main.closing_day, main.due_day) : null
@@ -79,9 +78,7 @@ export default function Ajustes() {
       </div>
       <div className="sec">Conta</div>
       <div className="card" style={{ padding: '2px 14px' }}>
-        <Sr icon="users" t="Pessoas" d={db!.members.map((m: any) => m.display_name).join(' e ')} v={db!.members.length} onClick={() => setPanel('people')} />
         <Sr icon="dl" t="Exportar dados" d="planilha CSV dos lançamentos" onClick={exportCsv} />
-        <div className="li tap" onClick={async () => { if (confirm('Sair da conta neste aparelho?')) await sb.auth.signOut() }}><Ic n="left" /><div className="t">Sair</div></div>
       </div>
       <div className="lbl" style={{ textAlign: 'center', margin: '6px 0 4px' }}>Tá Pago! · tudo aqui pode ser editado ou apagado por você</div>
       <div className="lbl" style={{ textAlign: 'center', marginBottom: 8, fontSize: 10 }}>versão {APP_VERSION.slice(0, 16).replace('T', ' ')}</div>
@@ -95,9 +92,6 @@ export default function Ajustes() {
       <div className="card" style={{ padding: '2px 14px' }}>{words.length === 0 && <Empty>Nenhuma.</Empty>}
         {words.slice(0, 200).map((k: any) => <div key={k.id} className="li tap" style={{ minHeight: 38, padding: '6px 0' }} onClick={() => wordForm(k)}><div className="t">{k.word}</div><span className="lbl">→ {catBy[k.category_id]?.name}</span>{k.learned && <span className="tag acc">aprendida</span>}<span className="sp" /><More items={editDel(() => wordForm(k), () => del('keywords', k.id))} /></div>)}
         <Add label="Nova palavra" onClick={() => wordForm()} /><div style={{ height: 8 }} /></div></Sheet>}
-    {panel === 'people' && <Sheet title="Pessoas" onClose={() => setPanel(null)}><div className="card" style={{ padding: '2px 14px' }}>
-      {db!.members.map((m: any) => <div key={m.user_id} className="li"><Ic n="user" /><div className="t">{m.display_name}</div></div>)}</div>
-      <div className="lbl">As duas contas veem e editam os mesmos dados. Para trocar a senha, fale com quem configurou o app.</div></Sheet>}
     {form}
   </>
 }

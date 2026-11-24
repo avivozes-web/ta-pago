@@ -27,7 +27,7 @@ export default defineConfig({
       workbox: {
         navigateFallback: '/ta-pago/index.html',
         globPatterns: ['**/*.{js,css,html,png,svg,ttf,woff2}'],
-        cleanupOutdatedCaches: true, skipWaiting: true, clientsClaim: true,
+        cacheId: 'tapago-v2', cleanupOutdatedCaches: true, skipWaiting: true, clientsClaim: true,
         runtimeCaching: [
           { urlPattern: /^https:\/\/[a-z0-9-]+\.supabase\.co\/.*/i, handler: 'NetworkOnly' },
           { urlPattern: /\/version\.json/, handler: 'NetworkOnly' },

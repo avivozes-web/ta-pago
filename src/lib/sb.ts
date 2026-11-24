@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-export const SUPABASE_URL = 'https://lmycoesvfulfrtrehayn.supabase.co'
-export const SUPABASE_KEY = 'sb_publishable_OSFMAzJhomuj7lRk5-ZXDg_0diIHs-M'
-export const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, storageKey: 'tapago-auth' } })
-export const userEmail = (u: string) => (u.includes('@') ? u.trim().toLowerCase() : `${u.trim().toLowerCase()}@tapago.app`)
+// Projeto Supabase próprio do Tá Pago! (sem login). A chave publishable é pública por natureza.
+export const SUPABASE_URL = 'https://zwofofifmxhyxzpbrgud.supabase.co'
+export const SUPABASE_KEY = 'sb_publishable_bNpWEfSlH28D6b4Yo6LpIg_cofbuzzJ'
+export const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } })

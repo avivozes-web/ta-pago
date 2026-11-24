@@ -1,3 +1,4 @@
+-- Tá Pago! (projeto Supabase próprio, SEM login). Acesso anon só às tabelas tp_*, uma casa só.
 -- Tá Pago! — tabelas com prefixo tp_ (não mexe em nada da Central)
 create table if not exists public.tp_households (
   id uuid primary key default gen_random_uuid(),
@@ -10,17 +11,13 @@ create table if not exists public.tp_households (
   alerts jsonb not null default '{"cat90":true,"pace":true,"leisure":true,"card":true,"bills":true}',
   created_at timestamptz not null default now()
 );
-create table if not exists public.tp_members (
-  user_id uuid primary key references auth.users(id) on delete cascade,
-  household_id uuid not null references public.tp_households(id) on delete cascade,
-  display_name text not null default ''
-);
 create or replace function public.tp_my_household() returns uuid
-language sql stable security definer set search_path = public as $$
-  select household_id from public.tp_members where user_id = auth.uid()
+language sql stable set search_path = public as $$
+  -- Sem login: uma casa só. Sempre a primeira (e única) casa.
+  select id from public.tp_households order by created_at limit 1
 $$;
-revoke all on function public.tp_my_household() from public, anon;
-grant execute on function public.tp_my_household() to authenticated;
+revoke all on function public.tp_my_household() from public;
+grant execute on function public.tp_my_household() to anon, authenticated;
 
 create table if not exists public.tp_categories (
   id uuid primary key default gen_random_uuid(),
@@ -158,20 +155,14 @@ begin
   foreach t in array array['tp_categories','tp_keywords','tp_cards','tp_income_sources','tp_invest_goals','tp_transactions','tp_manual_bills','tp_fixed','tp_fixed_paid','tp_wish_categories','tp_wishlist','tp_shop_sections','tp_shop_items','tp_shop_checks','tp_habits','tp_habit_logs','tp_tasks','tp_task_done'] loop
     execute format('alter table public.%I enable row level security', t);
     execute format('drop policy if exists %I on public.%I', t||'_hh', t);
-    execute format('create policy %I on public.%I for all to authenticated using (household_id = public.tp_my_household()) with check (household_id = public.tp_my_household())', t||'_hh', t);
-    execute format('grant select, insert, update, delete on public.%I to authenticated', t);
-    execute format('revoke all on public.%I from anon', t);
+    execute format('create policy %I on public.%I for all to anon, authenticated using (household_id = public.tp_my_household()) with check (household_id = public.tp_my_household())', t||'_hh', t);
+    execute format('grant select, insert, update, delete on public.%I to anon, authenticated', t);
   end loop;
 end $$;
 alter table public.tp_households enable row level security;
 drop policy if exists tp_households_sel on public.tp_households;
-create policy tp_households_sel on public.tp_households for select to authenticated using (id = public.tp_my_household());
+create policy tp_households_sel on public.tp_households for select to anon, authenticated using (true);
 drop policy if exists tp_households_upd on public.tp_households;
-create policy tp_households_upd on public.tp_households for update to authenticated using (id = public.tp_my_household()) with check (id = public.tp_my_household());
-grant select, update on public.tp_households to authenticated;
-revoke all on public.tp_households from anon;
-alter table public.tp_members enable row level security;
-drop policy if exists tp_members_sel on public.tp_members;
-create policy tp_members_sel on public.tp_members for select to authenticated using (household_id = public.tp_my_household());
-grant select on public.tp_members to authenticated;
-revoke all on public.tp_members from anon;
+create policy tp_households_upd on public.tp_households for update to anon, authenticated using (true) with check (true);
+grant select, update on public.tp_households to anon, authenticated;
+

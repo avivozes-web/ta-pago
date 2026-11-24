@@ -3,7 +3,8 @@
 App pessoal (PWA) da Isa e do Hiago: dinheiro (ciclo do dia 15 ao 14), casa e rotina.
 
 - React + Vite + TypeScript, PWA instalável (vite-plugin-pwa).
-- Dados no Supabase (projeto compartilhado com a Central, tabelas com prefixo `tp_`). RLS: cada tabela só mostra as linhas da casa de quem está logado (`tp_my_household()`).
+- Dados no Supabase, em projeto próprio e gratuito ("Tá Pago", sa-east-1), separado da Central.
+- **Sem login**: uma casa só, mesmos dados para todos. O papel `anon` lê e escreve só nas tabelas `tp_*` (escolha da Isa: quem tiver o link vê os dados).
 - A chave usada no app é a **publishable** (pública por natureza). A service role **não** entra no repositório.
 - `supabase/01_schema.sql`: estrutura e políticas. Os dados iniciais da Isa ficam só fora do repositório.
 

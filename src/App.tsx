@@ -1,11 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { HashRouter, Navigate, NavLink, Route, Routes, useLocation } from 'react-router-dom'
-import type { Session } from '@supabase/supabase-js'
-import { sb } from './lib/sb'
 import { DataProvider, useData } from './data'
 import { Icon } from './icons'
 import { Lancar } from './lancar'
-import Login from './pages/Login'
 import Inicio from './pages/Inicio'
 import Extrato from './pages/Extrato'
 import Fixos from './pages/Fixos'
@@ -37,7 +34,7 @@ function Nav() {
 function Shell() {
   const { loading, db, error, msg } = useData()
   if (loading && !db) return <div className="app" style={{ display: 'grid', placeItems: 'center', minHeight: '80vh' }}><Mark /></div>
-  if (error && !db?.hh) return <div className="app"><div className="wrap" style={{ paddingTop: 40 }}><div className="note neg"><Icon n="alert" /><div><div className="t">Não consegui abrir</div><div className="d">{error}</div></div></div><button className="btn l" onClick={() => sb.auth.signOut()}>Sair</button></div></div>
+  if (error && !db?.hh) return <div className="app"><div className="wrap" style={{ paddingTop: 40 }}><div className="note neg"><Icon n="alert" /><div><div className="t">Não consegui abrir</div><div className="d">{error}</div></div></div><button className="btn l" onClick={() => location.reload()}>Tentar de novo</button></div></div>
   return <div className="app">
     <Routes>
       <Route path="/" element={<Inicio />} />
@@ -59,13 +56,5 @@ function Shell() {
   </div>
 }
 export default function App() {
-  const [session, setSession] = useState<Session | null | undefined>(undefined)
-  useEffect(() => {
-    sb.auth.getSession().then(({ data }) => setSession(data.session))
-    const { data } = sb.auth.onAuthStateChange((_e, s) => setSession(s))
-    return () => data.subscription.unsubscribe()
-  }, [])
-  if (session === undefined) return null
-  if (!session) return <Login />
-  return <HashRouter><DataProvider key={session.user.id}><Shell /></DataProvider></HashRouter>
+  return <HashRouter><DataProvider><Shell /></DataProvider></HashRouter>
 }

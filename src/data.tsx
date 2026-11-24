@@ -6,7 +6,7 @@ export const TABLES = {
   categories: 'tp_categories', keywords: 'tp_keywords', cards: 'tp_cards', income: 'tp_income_sources', investGoals: 'tp_invest_goals',
   tx: 'tp_transactions', manualBills: 'tp_manual_bills', fixed: 'tp_fixed', fixedPaid: 'tp_fixed_paid', wishCats: 'tp_wish_categories',
   wish: 'tp_wishlist', shopSections: 'tp_shop_sections', shopItems: 'tp_shop_items', shopChecks: 'tp_shop_checks', habits: 'tp_habits',
-  habitLogs: 'tp_habit_logs', tasks: 'tp_tasks', taskDone: 'tp_task_done', members: 'tp_members',
+  habitLogs: 'tp_habit_logs', tasks: 'tp_tasks', taskDone: 'tp_task_done',
 } as const
 export type TKey = keyof typeof TABLES
 export type DB = { [K in TKey]: any[] } & { hh: any }
@@ -36,7 +36,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     let q = sb.from(TABLES[t]).select('*')
     if (t === 'habitLogs') q = q.gte('day', addDays(today, -200))
     if (ORDER[t]) q = q.order(ORDER[t]!, { ascending: true })
-    if (t !== 'members') q = q.order('id')
+    q = q.order('id')
     const { data, error } = await q
     if (error) throw error
     return data || []
@@ -49,7 +49,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const keys = Object.keys(TABLES) as TKey[]
       const [hh, ...rows] = await Promise.all([fetchHH(), ...keys.map(fetchTable)])
       const next: any = { hh }; keys.forEach((k, i) => (next[k] = rows[i]))
-      setDb(next); setError(hh ? null : 'Sua conta ainda não está ligada a uma casa.')
+      setDb(next); setError(hh ? null : 'Não encontrei os dados da casa.')
     } catch (e: any) { setError(e.message || String(e)) } finally { setLoading(false) }
   }, [fetchHH, fetchTable])
   useEffect(() => { loadAll() }, [loadAll])
