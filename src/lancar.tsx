@@ -152,3 +152,21 @@ export function TxEdit({ t, onClose }: { t: any; onClose: () => void }) {
   </FormSheet>
 }
 export { addDays, todayStr }
+
+/** Salário: mudar o valor vale do ciclo escolhido para frente. */
+export function salaryValueForm(ctx: any, s: any, fromKey: string, setForm: (f: any) => void) {
+  const { upd, naming } = ctx
+  const rates = (Array.isArray(s.rates) ? s.rates : [])
+  const cur = [...rates].filter((r: any) => r.from <= fromKey).sort((a: any, b: any) => a.from.localeCompare(b.from)).pop()
+  setForm({ title: `Valor · ${s.name}`, initial: { amount: cur ? Number(cur.amount) : Number(s.expected_amount) || '' }, fields: [{ k: 'amount', label: `Valor a partir de ${cycleName(fromKey, naming)}`, type: 'money', required: true, hint: `Vale de ${cycleName(fromKey, naming)} em diante. Os meses anteriores ficam como estavam.` }],
+    onSave: (v: any) => upd('income', s.id, { rates: [...rates.filter((r: any) => r.from < fromKey), { from: fromKey, amount: v.amount }] }) })
+}
+/** "Recebi antes" (ou outro valor): grava o salário com a data certa, no ciclo do salário. */
+export function salaryReceivedForm(ctx: any, row: any, key: string, setForm: (f: any) => void) {
+  const { ins, upd, del, today, naming } = ctx
+  const real = row.real?.[0]
+  setForm({ title: `${row.source.name} · ${cycleName(key, naming)}`, initial: { date: real?.date || today, amount: real ? Number(real.amount) : row.net },
+    fields: [{ k: 'date', label: 'Recebi em', type: 'date', required: true }, { k: 'amount', label: 'Valor recebido', type: 'money', required: true, positive: true, hint: row.adv > 0 ? `Já descontado o adiantamento de ${brl(row.adv)}.` : undefined }],
+    onSave: async (v: any) => real ? upd('tx', real.id, { date: v.date, amount: v.amount }) : !!(await ins('tx', { kind: 'entrada', description: row.source.name, amount: v.amount, date: v.date, payment: 'pix', income_source_id: row.source.id, is_advance: false, for_cycle: key })),
+    onDelete: real ? () => del('tx', real.id) : undefined })
+}

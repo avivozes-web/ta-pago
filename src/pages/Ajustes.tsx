@@ -7,22 +7,23 @@ import { brl } from '../lib/fmt'
 import { cycleName, billCycleKey, billDueFor } from '../lib/cycle'
 import { norm } from '../lib/parse'
 import { APP_VERSION } from '../lib/pwa'
+import { expectedFor } from '../lib/calc'
+import { salaryValueForm } from '../lancar'
 
 function Sr({ icon, t, d, v, onClick }: { icon: string; t: string; d?: string; v?: any; onClick: () => void }) {
   return <div className="li tap" onClick={onClick}><Ic n={icon} /><div><div className="t">{t}</div>{d && <div className="d">{d}</div>}</div><span className="sp lbl n" style={{ color: 'var(--ink2)' }}>{v}</span><span style={{ color: 'var(--mut2)' }}><Icon n="right" s={16} /></span></div>
 }
 export default function Ajustes() {
-  const { db, currentKey, naming, startDay, today, ins, upd, del, updHH, toast } = useData(); const nav = useNavigate()
+  const ctx = useData(); const { db, currentKey, naming, startDay, today, ins, upd, del, updHH, toast } = ctx; const nav = useNavigate()
   const [form, setForm] = useForm(); const [panel, setPanel] = useState<null | 'cats' | 'words'>(null); const [wq, setWq] = useState('')
   const hh = db!.hh
   const main = db!.cards.find((c: any) => c.is_main) || db!.cards[0]
   const exDue = main ? billDueFor(today, main.closing_day, main.due_day) : null
   const incForm = (s?: any) => setForm({ title: s ? 'Editar entrada' : 'Nova entrada recorrente', initial: s ? { ...s, expected_amount: Number(s.expected_amount) } : { is_salary: false }, fields: [
     { k: 'name', label: 'Nome', type: 'text', required: true },
-    { k: 'expected_amount', label: 'Valor esperado por ciclo', type: 'money', hint: 'Usado em "Entradas previstas" e para descontar o adiantamento.' },
-    { k: 'is_salary', label: 'É salário', type: 'toggle', hint: 'Pode ter adiantamento' },
+    { k: 'is_salary', label: 'Salário recorrente', type: 'toggle', hint: 'Entra sozinho todo mês no dia do salário' },
     { k: 'aliases', label: 'Outros nomes que você escreve', type: 'text', placeholder: 'ex.: salario isa, isa' }],
-    onSave: async (v) => { const row = { name: v.name, expected_amount: v.expected_amount ?? 0, is_salary: !!v.is_salary, aliases: v.aliases || '' }; return s ? upd('income', s.id, row) : !!(await ins('income', { ...row, sort: db!.income.length + 1 })) },
+    onSave: async (v) => { const row = { name: v.name, is_salary: !!v.is_salary, aliases: v.aliases || '' }; return s ? upd('income', s.id, row) : !!(await ins('income', { ...row, sort: db!.income.length + 1 })) },
     onDelete: s ? () => del('income', s.id) : undefined })
   const catForm = (c?: any) => setForm({ title: c ? 'Editar categoria' : 'Nova categoria', initial: c ? { ...c, goal: c.goal == null ? '' : Number(c.goal) } : { macro: 'viver', is_leisure: false, is_invest: false }, fields: [
     { k: 'name', label: 'Nome', type: 'text', required: true },
@@ -58,7 +59,7 @@ export default function Ajustes() {
       </div>
       <div className="sec">Entradas recorrentes</div>
       <div className="card" style={{ padding: '2px 14px' }}>
-        {db!.income.map((s: any) => <div key={s.id} className="li tap" onClick={() => incForm(s)}><div><div className="t">{s.name}</div>{s.is_salary && <div className="d">salário · pode ter adiantamento</div>}</div><b className="sp n" style={{ fontWeight: 600, color: Number(s.expected_amount) ? undefined : 'var(--mut)' }}>{Number(s.expected_amount) ? brl(Number(s.expected_amount)) : 'definir valor'}</b><span style={{ color: 'var(--mut2)' }}><Icon n="edit" s={15} /></span><More items={editDel(() => incForm(s), async () => { if (confirm(`Apagar "${s.name}"?`)) await del('income', s.id) })} /></div>)}
+        {db!.income.map((s: any) => { const v = s.is_salary ? expectedFor(s, currentKey) : Number(s.expected_amount); return <div key={s.id} className="li tap" onClick={() => (s.is_salary ? salaryValueForm(ctx, s, currentKey, setForm) : incForm(s))}><div><div className="t">{s.name}</div><div className="d">{s.is_salary ? `todo dia ${startDay}, entra sozinho · pode ter adiantamento` : 'manual: você lança quando entrar'}</div></div><b className="sp n" style={{ fontWeight: 600, color: v ? undefined : 'var(--mut)' }}>{s.is_salary ? (v ? brl(v) : 'definir valor') : ''}</b><span style={{ color: 'var(--mut2)' }}><Icon n="edit" s={15} /></span><More items={editDel(() => incForm(s), async () => { if (confirm(`Apagar "${s.name}"?`)) await del('income', s.id) }, s.is_salary ? [{ label: 'Mudar valor', icon: 'cal', onClick: () => salaryValueForm(ctx, s, currentKey, setForm) }] : [])} /></div> })}
         <Add label="Adicionar entrada" onClick={() => incForm()} /><div style={{ height: 8 }} /></div>
       <div className="sec">Dinheiro</div>
       <div className="card" style={{ padding: '2px 14px' }}>

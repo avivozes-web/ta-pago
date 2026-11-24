@@ -2,9 +2,9 @@ import { useMemo } from 'react'
 import { useData } from '../data'
 import { Icon } from '../icons'
 import { Header, CycleBanner, Seg, DIN, Ic, More, editDel, Add, useForm, Empty, Bar } from '../ui'
-import { cycleData } from '../lib/calc'
+import { cycleData, overdraftPayDate } from '../lib/calc'
 import { brl, ddmm } from '../lib/fmt'
-import { cycleName, billCycleKey, billDueFor, addMonthsDate, addDays, cycleRange } from '../lib/cycle'
+import { cycleName, billCycleKey, billDueFor, addMonthsDate, addDays, cycleRange, cycleKeyOf } from '../lib/cycle'
 
 const full = (n: string) => (n === 'BB' ? 'Banco do Brasil' : n)
 export default function Cartoes() {
@@ -78,6 +78,25 @@ export default function Cartoes() {
             <div className="row n" style={{ fontSize: 11.5, color: 'rgba(255,255,255,.65)' }}><span>{Math.round((amt / goal) * 100)}% da meta</span><span className="sp">disponível {brl(Math.max(0, Number(main.limit_amount) - amt))}</span></div></> : null}
           <div className="row" style={{ gap: 6, marginTop: 10 }}>{chip(main, 'closing_day', 'Fecha', `dia ${main.closing_day}`)}{chip(main, 'due_day', 'Vence', `dia ${main.due_day}`)}{chip(main, 'limit_amount', 'Limite', brl(Number(main.limit_amount), false).replace('R$ ', ''), true)}{chip(main, 'goal', 'Meta', main.goal == null ? '—' : brl(Number(main.goal), false).replace('R$ ', ''), true)}</div>
         </div> })()}
+      {(db!.overdraft || []).map((o: any) => { const used = Number(o.used_amount); const lim = Number(o.limit_amount); const pd = overdraftPayDate(o, today, startDay)
+        const odForm = () => setForm({ title: o.name, initial: { used_amount: used || '', limit_amount: lim, pay_date: pd, name: o.name }, fields: [
+          { k: 'used_amount', label: 'Quanto está usado agora', type: 'money', hint: 'Digite o valor usado. Ele entra como conta a pagar.' },
+          { k: 'pay_date', label: 'Vai ser pago em', type: 'date', required: true, hint: `Padrão: no próximo salário (dia ${startDay}).` },
+          { k: 'limit_amount', label: 'Limite', type: 'money', required: true },
+          { k: 'name', label: 'Nome', type: 'text', required: true }],
+          onSave: (v) => { if ((v.used_amount || 0) > v.limit_amount) { toast('O usado passou do limite. Confira o valor.'); } return upd('overdraft', o.id, { used_amount: v.used_amount || 0, limit_amount: v.limit_amount, pay_date: v.pay_date, name: v.name }) } })
+        const paid = async () => { if (!used) return; if (!confirm(`Marcar ${brl(used)} do ${o.name} como pago hoje? O valor vai para o extrato e o usado volta para zero.`)) return
+          const cat = db!.categories.find((c: any) => /contas/i.test(c.name))
+          const r = await ins('tx', { kind: 'saida', description: o.name, amount: used, date: today, payment: 'pix', category_id: cat?.id || null })
+          if (r) { await upd('overdraft', o.id, { used_amount: 0, pay_date: null }); toast('Cheque especial zerado') } }
+        return <div key={o.id} className="card tap" onClick={odForm}>
+          <div className="ch"><Ic n="alert" /><div style={{ marginLeft: 10 }}><h3>{o.name}</h3><div className="lbl n">limite {brl(lim, false)} · {used ? `pagar em ${ddmm(pd)} (ciclo ${cycleName(cycleKeyOf(pd, startDay), naming)})` : 'nada usado'}</div></div><b className="sp n" style={{ fontSize: 16, color: used ? 'var(--neg)' : undefined }}>{brl(used)}</b></div>
+          <Bar thin pct={lim ? (used / lim) * 100 : 0} color={used ? 'var(--neg)' : undefined} />
+          <div className="row" style={{ gap: 6, marginTop: 10 }} onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="btn l" style={{ flex: 1, padding: 9, fontSize: 12.5 }} onClick={odForm}><Icon n="edit" /> Usei / mudar valor</button>
+            <button type="button" className="btn" style={{ flex: 1, padding: 9, fontSize: 12.5 }} disabled={!used} onClick={paid}><Icon n="check" /> Paguei</button>
+          </div>
+        </div> })}
       {main && <div className="card" style={{ padding: '12px 14px 4px' }}><div className="ch"><h3>Próximas faturas</h3><span className="sp lbl">{main.name} · já lançadas</span></div>
         {future(main).length === 0 && <Empty>Nada lançado para os próximos ciclos.</Empty>}
         {future(main).map((f) => <div key={f.due} className="li"><div><div className="t">{ddmm(f.due)} · {cname(f.due)}</div><div className="d">{[f.n && `${f.n} parcela${f.n > 1 ? 's' : ''}`, f.manual && 'digitada à mão'].filter(Boolean).join(' · ')}</div></div><div className="v">{brl(f.amount)}</div></div>)}

@@ -6,6 +6,7 @@ import { Lancar } from './lancar'
 import Inicio from './pages/Inicio'
 import Extrato from './pages/Extrato'
 import Fixos from './pages/Fixos'
+import Fluxo from './pages/Fluxo'
 import Cartoes from './pages/Cartoes'
 import Metas from './pages/Metas'
 import Investir from './pages/Investir'
@@ -39,6 +40,7 @@ function Shell() {
     <Routes>
       <Route path="/" element={<Inicio />} />
       <Route path="/dinheiro/extrato" element={<Extrato />} />
+      <Route path="/dinheiro/fluxo" element={<Fluxo />} />
       <Route path="/dinheiro/fixos" element={<Fixos />} />
       <Route path="/dinheiro/cartoes" element={<Cartoes />} />
       <Route path="/dinheiro/metas" element={<Metas />} />

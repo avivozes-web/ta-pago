@@ -6,7 +6,7 @@ import { Note, cycleRng } from '../ui'
 import { cycleData } from '../lib/calc'
 import { brl } from '../lib/fmt'
 import { cycleName, shiftKey, cycleRange, addDays, dow } from '../lib/cycle'
-import { CatBars } from './Inicio'
+import { CatPie } from './Inicio'
 
 export default function Fechamento() {
   const { db, key, currentKey, today, naming, startDay, setKey } = useData(); const nav = useNavigate()
@@ -36,7 +36,7 @@ export default function Fechamento() {
         <div className="g3">{[['Entradas', cd.entradas], ['Saídas', cd.saidas], ['Guardado', guardado]].map(([a, v]) => <div key={a as string} style={{ background: 'rgba(255,255,255,.07)', borderRadius: 10, padding: '8px 10px' }}><div style={{ fontSize: 10.5, color: 'rgba(255,255,255,.55)' }}>{a}</div><div className="n" style={{ fontWeight: 600, fontSize: 13 }}>{brl(v as number, false)}</div></div>)}</div>
       </div>
       {cd.cap > 0 && (cd.saidas <= cd.cap ? <Note kind="acc" icon="target" t="Teto batido" d={`${brl(cd.saidas, false)} de ${brl(cd.cap, false)}. Ficaram ${brl(cd.cap - cd.saidas, false)} de folga.`} /> : <Note kind="neg" icon="target" t="Passou do teto" d={`${brl(cd.saidas, false)} de ${brl(cd.cap, false)} · ${brl(cd.saidas - cd.cap, false)} acima.`} />)}
-      <div className="card"><div className="ch"><h3>Onde mais gastaram</h3></div><CatBars db={db} cd={cd} n={3} /></div>
+      <div className="card"><div className="ch"><h3>Onde mais gastaram</h3></div><CatPie db={db} cd={cd} n={5} /></div>
       {goals.length > 0 && <div className="card" style={{ padding: '12px 14px 4px' }}><div className="ch"><h3>Metas por categoria</h3><span className="sp tag acc">{goals.length - over.length} de {goals.length}</span></div>
         {over.length === 0 && <div className="lbl" style={{ padding: '4px 0 10px' }}>Todas as metas cumpridas.</div>}
         {over.map((c: any) => <div key={c.id} className="li" style={{ minHeight: 36 }}><span className="t" style={{ fontWeight: 400, color: 'var(--ink2)' }}>{c.name}</span><b className="sp n" style={{ fontWeight: 600, fontSize: 12.5, color: 'var(--neg)' }}>{brl((cd.byCat[c.id] || 0) - Number(c.goal), false)} acima</b></div>)}
