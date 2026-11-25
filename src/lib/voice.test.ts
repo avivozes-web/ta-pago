@@ -51,3 +51,38 @@ test('mais jeitos de falar', () => {
   const d = parseVoice('fiz devocional, academia e beber água', ctx) as any[]
   assert.deepEqual(d.map((x) => x.habitId), ['h1', 'h2', 'h3'])
 })
+
+test('frase misturada: gastos e hábitos sem pontuação', () => {
+  const r = parseVoice('Docinho 15 uber 18 fui a academia devocional', ctx) as any[]
+  const k = r.map((i) => i.kind)
+  assert.deepEqual(k, ['gasto', 'gasto', 'habito', 'habito'], JSON.stringify(r, null, 1))
+  assert.equal(r[0].description, 'Docinho'); assert.equal(r[0].amount, 15); assert.equal(r[0].categoryId, 'lan')
+  assert.equal(r[1].description, 'Uber'); assert.equal(r[1].amount, 18); assert.equal(r[1].categoryId, 'tra')
+  assert.equal(r[2].habitId, 'h2'); assert.equal(r[3].habitId, 'h1')
+})
+test('3 ubers de 18 são 3 gastos, não parcelas', () => {
+  const r = parseVoice('3 ubers de 18', ctx) as any[]
+  assert.equal(r.length, 3)
+  assert.ok(r.every((x) => x.kind === 'gasto' && x.amount === 18 && x.installments === 1 && x.description === 'Uber'))
+})
+test('uber 18 três vezes sem cartão são 3 gastos', () => {
+  const r = parseVoice('uber 18 três vezes', ctx) as any[]
+  assert.equal(r.length, 3, JSON.stringify(r, null, 1))
+  assert.ok(r.every((x) => x.kind === 'gasto' && x.amount === 18 && x.installments === 1 && !x.cardId))
+})
+test('parcelado em 3 no Nubank vira crédito em 3 parcelas', () => {
+  const r = parseVoice('uber 18 parcelado em 3 no Nubank', ctx) as any[]
+  assert.equal(r.length, 1, JSON.stringify(r, null, 1))
+  assert.equal(r[0].kind, 'gasto'); assert.equal(r[0].amount, 18); assert.equal(r[0].cardId, 'nu'); assert.equal(r[0].installments, 3); assert.equal(r[0].payment, 'credito')
+})
+test('fui na academia e academia feita', () => {
+  const a = parseVoice('fui na academia', ctx) as any[]
+  assert.equal(a.length, 1); assert.equal(a[0].kind, 'habito'); assert.equal(a[0].habitId, 'h2')
+  const b = parseVoice('academia e devocional feitos', ctx) as any[]
+  assert.deepEqual(b.map((x) => x.habitId).sort(), ['h1', 'h2'])
+})
+test('comi um doce de 5', () => {
+  const r = parseVoice('comi um doce de 5', ctx) as any[]
+  assert.equal(r.length, 1); assert.equal(r[0].kind, 'gasto'); assert.equal(r[0].amount, 5)
+  assert.match(r[0].description, /doce/i)
+})

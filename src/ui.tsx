@@ -145,7 +145,7 @@ export function CycleBanner() {
 export function Seg({ items }: { items: [string, string][] }) {
   return <div className="segc">{items.map(([to, l]) => <NavLink key={to} to={to} className={({ isActive }) => (isActive ? 'on' : '')}>{l}</NavLink>)}</div>
 }
-export const DIN: [string, string][] = [['/dinheiro/extrato', 'Extrato'], ['/dinheiro/fluxo', 'Fluxo'], ['/dinheiro/fixos', 'Fixos'], ['/dinheiro/cartoes', 'Cartões'], ['/dinheiro/metas', 'Metas'], ['/dinheiro/investir', 'Investir']]
+export const DIN: [string, string][] = [['/dinheiro/extrato', 'Extrato'], ['/dinheiro/fluxo', 'Fluxo'], ['/dinheiro/fixos', 'Fixos'], ['/dinheiro/cartoes', 'Cartões'], ['/dinheiro/metas', 'Metas'], ['/dinheiro/investir', 'Planejamento']]
 export const CASA: [string, string][] = [['/casa/compras', 'Compras'], ['/casa/tarefas', 'Tarefas']]
 export const EU: [string, string][] = [['/eu/habitos', 'Hábitos'], ['/eu/wishlist', 'Wishlist']]
 

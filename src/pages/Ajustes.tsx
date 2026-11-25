@@ -9,8 +9,8 @@ import { ddmm, PAY_LABEL } from '../lib/fmt'
 import { quickList, QUICK_DEFAULT } from '../lib/quick'
 import { norm } from '../lib/parse'
 import { APP_VERSION } from '../lib/pwa'
-import { expectedFor } from '../lib/calc'
-import { salaryValueForm } from '../lancar'
+import { expectedFor, cycleData } from '../lib/calc'
+import { salaryValueForm, salaryReceivedForm } from '../lancar'
 
 function Sr({ icon, t, d, v, onClick }: { icon: string; t: string; d?: string; v?: any; onClick: () => void }) {
   return <div className="li tap" onClick={onClick}><Ic n={icon} /><div><div className="t">{t}</div>{d && <div className="d">{d}</div>}</div><span className="sp lbl n" style={{ color: 'var(--ink2)' }}>{v}</span><span style={{ color: 'var(--mut2)' }}><Icon n="right" s={16} /></span></div>
@@ -69,6 +69,9 @@ export default function Ajustes() {
   const words = db!.keywords.filter((k: any) => !wq || k.word.includes(norm(wq))).sort((a: any, b: any) => Number(b.learned) - Number(a.learned) || a.word.localeCompare(b.word))
   const catBy = Object.fromEntries(db!.categories.map((c: any) => [c.id, c]))
   const manha = db!.habits.filter((h: any) => h.routine === 'manha').length, noite = db!.habits.filter((h: any) => h.routine === 'noite').length
+  const nk = shiftKey(currentKey, 1)
+  const curSal = cycleData(db, currentKey, today).incomeRows.filter((r: any) => r.source.is_salary)
+  const nextSal = cycleData(db, nk, today).incomeRows.filter((r: any) => r.source.is_salary && r.expected > 0)
   return <>
     <div className="hdr"><Mark /><button type="button" className="ib" style={{ marginLeft: 'auto' }} aria-label="fechar" onClick={() => nav(-1)}><Icon n="x" /></button></div>
     <div className="ttl">Ajustes</div>
@@ -83,7 +86,9 @@ export default function Ajustes() {
       <div className="sec">Mês que começou antes</div>
       <div className="card" style={{ padding: '2px 14px' }}>
         {Object.entries(hh.cycle_starts || {}).sort().map(([k, d]: any) => <div key={k} className="li tap" onClick={() => startForm(k, d)}><Ic n="cal" /><div><div className="t">{cycleName(k, naming)} {keyParts(k).y} começou em {ddmm(d)}</div><div className="d">{cycleName(shiftKey(k, -1), naming)} terminou em {ddmm(prevDay(d))} · o normal seria dia {startDay}</div></div><More items={editDel(() => startForm(k, d), async () => { if (confirm(`Voltar ${cycleName(k, naming)} para o dia ${startDay}?`)) await updHH({ cycle_starts: without(k) }) })} /></div>)}
-        {!Object.keys(hh.cycle_starts || {}).length && <div className="lbl" style={{ padding: '10px 0 2px' }}>Quando o salário cai antes do dia {startDay} e você marca "Recebi antes", o app pergunta se o mês novo começa naquele dia. Fica guardado aqui.</div>}
+        {!Object.keys(hh.cycle_starts || {}).length && <div className="lbl" style={{ padding: '10px 0 2px' }}>Quando o salário cai antes do dia {startDay}, marque abaixo. O app pergunta se o mês novo começa naquele dia (os fixos também recomeçam). Fica guardado aqui.</div>}
+        {curSal.map((r: any) => <div key={r.source.id} className="li"><Ic n="trend" /><div style={{ minWidth: 0, flex: 1 }}><div className="t">{r.source.name} · {cycleName(currentKey, naming)}</div><div className="d">{r.real.length ? `recebido ${ddmm(r.real[0].date)}` : r.auto ? `previsto no dia ${startDay}` : 'se caiu antes do dia ' + startDay + ', marque aqui'}</div></div><button type="button" className="tag acc" onClick={() => salaryReceivedForm(ctx, r, currentKey, setForm)}>{r.real.length ? 'Editar' : 'Recebi antes'}</button></div>)}
+        {nextSal.map((r: any) => <div key={'n'+r.source.id} className="li"><Ic n="trend" /><div style={{ minWidth: 0, flex: 1 }}><div className="t">{r.source.name} · {cycleName(nk, naming)}</div><div className="d">{r.real.length ? `recebido ${ddmm(r.real[0].date)}` : 'chegou antes do dia ' + startDay + '?'}</div></div><button type="button" className="tag acc" onClick={() => salaryReceivedForm(ctx, r, nk, setForm)}>{r.real.length ? 'Editar' : 'Recebi antes'}</button></div>)}
         <Add label="Começar um mês em outro dia" onClick={() => startForm()} /><div style={{ height: 8 }} />
       </div>
       <div className="sec">Atalhos de gastos</div>
@@ -113,7 +118,7 @@ export default function Ajustes() {
       </div>
       <div className="sec">Casa e rotina</div>
       <div className="card" style={{ padding: '2px 14px' }}>
-        <Sr icon="cart" t="Lista de compras" d={`volta todo dia ${startDay}`} v={db!.shopItems.length} onClick={() => nav('/casa/compras')} />
+        <Sr icon="cart" t="Lista de compras" d="você marca e desmarca" v={db!.shopItems.length} onClick={() => nav('/casa/compras')} />
         <Sr icon="house" t="Tarefas da casa" v={db!.tasks.length} onClick={() => nav('/casa/tarefas')} />
         <Sr icon="sun" t="Hábitos e rotinas" d={`manhã ${manha} · noite ${noite}`} v={db!.habits.length} onClick={() => nav('/eu/habitos')} />
         <Sr icon="heart" t="Wishlist" d="categorias e desejos" v={db!.wishCats.length} onClick={() => nav('/eu/wishlist')} />

@@ -18,7 +18,12 @@ export default function Wishlist() {
   const yr = (m: string) => (m.slice(0, 4) !== currentKey.slice(0, 4) ? ` ${m.slice(0, 4)}` : '')
   const mName = (m: string) => `${cycleName(m, naming)}${yr(m)}`
   // meses na tela: este, o próximo, os que ela adicionou e os que já têm itens
-  const months = useMemo(() => Array.from(new Set([currentKey, shiftKey(currentKey, 1), ...(db!.hh.wish_months || []), ...items.map((w: any) => w.planned_month).filter(Boolean)])).sort() as string[], [db, currentKey, items])
+  const months = useMemo(() => {
+    const hide = new Set<string>(db!.hh.wish_hidden_months || [])
+    const have = new Set(items.map((w: any) => w.planned_month).filter(Boolean))
+    const raw = [currentKey, shiftKey(currentKey, 1), ...(db!.hh.wish_months || []), ...have]
+    return Array.from(new Set(raw.filter((m) => m && (!hide.has(m) || have.has(m))))).sort() as string[]
+  }, [db, currentKey, items])
   const free = (m: string) => cycleData(db, m, today).free
   const shown = (w: any) => !filter || w.wish_category_id === filter
   const itemForm = (w?: any, month?: string) => setForm({ title: w ? 'Editar desejo' : 'Novo desejo', initial: w ? { ...w, amount: Number(w.amount) || '', planned_month: w.planned_month || '' } : { wish_category_id: filter || wcats[0]?.id, planned_month: month ?? currentKey }, fields: [
@@ -32,11 +37,25 @@ export default function Wishlist() {
     onDelete: w ? () => del('wish', w.id) : undefined })
   const moveForm = (w: any) => setForm({ title: `Mover "${w.name}"`, initial: { planned_month: w.planned_month || '' }, fields: [{ k: 'planned_month', label: 'Para qual mês', type: 'select', options: months.map((m) => ({ v: m, l: mName(m) })), hint: 'Vazio = Sem mês' }], saveLabel: 'Mover', onSave: (v) => upd('wish', w.id, { planned_month: v.planned_month || null }) })
   const addMonth = () => { const opts = Array.from({ length: 24 }, (_, i) => shiftKey(currentKey, i)).filter((m) => !months.includes(m))
-    setForm({ title: 'Adicionar mês', initial: { m: opts[0] }, fields: [{ k: 'm', label: 'Mês', type: 'select', required: true, options: opts.map((m) => ({ v: m, l: mName(m) })) }], saveLabel: 'Adicionar', onSave: (v) => updHH({ wish_months: Array.from(new Set([...(db!.hh.wish_months || []), v.m])).sort() }) }) }
-  const removeMonth = async (m: string) => { const list = items.filter((w: any) => w.planned_month === m)
-    if (!confirm(list.length ? `Tirar ${mName(m)}? Os ${list.length} itens vão para "Sem mês".` : `Tirar ${mName(m)}?`)) return
-    for (const w of list) await upd('wish', w.id, { planned_month: null })
-    await updHH({ wish_months: (db!.hh.wish_months || []).filter((x: string) => x !== m) }) }
+    setForm({ title: 'Adicionar mês', initial: { m: opts[0] }, fields: [{ k: 'm', label: 'Mês', type: 'select', required: true, options: opts.map((m) => ({ v: m, l: mName(m) })) }], saveLabel: 'Adicionar', onSave: (v) => updHH({ wish_months: Array.from(new Set([...(db!.hh.wish_months || []), v.m])).sort(), wish_hidden_months: (db!.hh.wish_hidden_months || []).filter((x: string) => x !== v.m) }) }) }
+  const removeMonth = (m: string) => {
+    const list = items.filter((w: any) => w.planned_month === m)
+    const others = months.filter((x) => x !== m)
+    setForm({ title: `Tirar ${mName(m)}`, initial: { dest: 'none', to: others[0] || '' },
+      fields: list.length ? [
+        { k: 'dest', label: 'O que fazer com os desejos', type: 'ops', options: [{ v: 'none', l: 'Mover para Sem mês' }, { v: 'move', l: 'Mover para outro mês' }, { v: 'del', l: 'Apagar junto' }] },
+        { k: 'to', label: 'Para qual mês', type: 'select', options: others.map((x) => ({ v: x, l: mName(x) })) },
+      ] : [],
+      show: (v) => ({ to: v.dest === 'move' }),
+      saveLabel: 'Tirar este mês',
+      children: list.length ? undefined : undefined,
+      onSave: async (v) => {
+        if (v.dest === 'del') { for (const w of list) await del('wish', w.id) }
+        else if (v.dest === 'move') { if (!v.to) { toast('Escolha o mês'); return false } for (const w of list) await upd('wish', w.id, { planned_month: v.to }) }
+        else { for (const w of list) await upd('wish', w.id, { planned_month: null }) }
+        return updHH({ wish_months: (db!.hh.wish_months || []).filter((x: string) => x !== m), wish_hidden_months: Array.from(new Set([...(db!.hh.wish_hidden_months || []), m])) })
+      } })
+  }
   const catForm = (c?: any) => setForm({ title: c ? 'Renomear categoria' : 'Nova categoria', initial: c || {}, fields: [{ k: 'name', label: 'Nome', type: 'text', required: true }],
     onSave: async (v) => (c ? upd('wishCats', c.id, { name: v.name }) : !!(await ins('wishCats', { name: v.name, sort: wcats.length + 1 }))),
     onDelete: c ? async () => { await del('wishCats', c.id); toast('Os itens ficaram sem categoria') } : undefined })
@@ -53,12 +72,11 @@ export default function Wishlist() {
     const total = list.filter((w: any) => !w.bought).reduce((a: number, w: any) => a + Number(w.amount), 0)
     const bought = list.filter((w: any) => w.bought).reduce((a: number, w: any) => a + Number(w.amount), 0)
     const fr = m ? free(m) : null
-    const fixed = m === currentKey || m === shiftKey(currentKey, 1)
     return <div key={id} className="card" style={{ padding: '12px 14px 4px' }}>
       <div className="ch tap" onClick={() => setOpen({ ...open, [id]: !op })}><Icon n={m ? 'cal' : 'list'} s={15} /><h3 style={{ marginLeft: 6 }}>{m ? mName(m) : 'Sem mês'}</h3>
         <span className="sp n" style={{ fontWeight: 650 }}>{brl(total)}</span>
         <span style={{ color: 'var(--mut2)', marginLeft: 4, transform: op ? 'rotate(180deg)' : undefined, display: 'grid' }}><Icon n="down" s={16} /></span>
-        {m && !fixed && <More items={[{ label: 'Tirar este mês', icon: 'trash', neg: true, onClick: () => removeMonth(m) }]} />}</div>
+        {m && <More items={[{ label: 'Tirar este mês', icon: 'trash', neg: true, onClick: () => removeMonth(m) }]} />}</div>
       {m && (bought > 0 || fr != null) && <div className="lbl n" style={{ margin: '-4px 0 4px' }}>{bought > 0 ? `já comprado ${brl(bought)}` : ''}{bought > 0 && fr != null ? ' · ' : ''}{fr != null && total > 0 ? (fr >= total ? 'cabe no que sobra do ciclo' : 'passa do que sobra do ciclo') : ''}</div>}
       {op && <>{list.length === 0 && <Empty>{m ? 'Nada planejado para este mês.' : 'Vazio.'}</Empty>}{list.map((w: any) => <Item key={w.id} w={w} />)}
         <Add label={m ? `Adicionar em ${cycleName(m, naming)}` : 'Adicionar sem mês'} onClick={() => itemForm(undefined, m || '')} /><div style={{ height: 8 }} /></>}

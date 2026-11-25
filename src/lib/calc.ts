@@ -1,4 +1,4 @@
-import { billCycleKey, cycleKeyOf, cycleRange, diffDays, addDays, shiftKey, parts, ds, monthLen, type Naming } from './cycle'
+import { billCycleKey, cycleKeyOf, cycleRange, diffDays, addDays, shiftKey, parts, ds, monthLen, addMonthsDate, type Naming } from './cycle'
 export type DBx = any
 export interface CardBill { card: any; due: string; amount: number; manual: number; items: any[] }
 
@@ -25,6 +25,21 @@ export function fixedDueIn(f: any, range: { start: string; end: string }) {
 export function overdraftPayDate(od: any, today: string, startDay: number) {
   return od.pay_date || cycleRange(shiftKey(cycleKeyOf(today, startDay), 1), startDay).start
 }
+
+export function isCardPaymentCat(c: any) {
+  if (!c) return false
+  if (c.exclude_from_spend) return true
+  const n = String(c.name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  return n.startsWith('pagamento de cartao')
+}
+export function loanInstallments(loan: any) {
+  const paid = loan.paid && typeof loan.paid === 'object' ? loan.paid : {}
+  return Array.from({ length: Number(loan.installments) || 0 }, (_, i) => {
+    const n = i + 1
+    const due = addMonthsDate(loan.first_due, i)
+    return { loan, n, due, amount: Number(loan.amount), paidOn: paid[String(n)] || paid[n] || null }
+  })
+}
 export function cycleData(db: DBx, key: string, today: string) {
   const S = db.hh.cycle_start_day, N: Naming = db.hh.cycle_naming
   const range = cycleRange(key, S)
@@ -42,21 +57,30 @@ export function cycleData(db: DBx, key: string, today: string) {
   const txs = [...realTxs, ...autoSal]
   const ins = txs.filter((t: any) => t.kind === 'entrada')
   const outs = txs.filter((t: any) => t.kind === 'saida')
+  const noSpend = new Set((db.categories || []).filter((c: any) => isCardPaymentCat(c)).map((c: any) => c.id))
+  const spendOuts = outs.filter((t: any) => !noSpend.has(t.category_id))
+  const payOuts = outs.filter((t: any) => noSpend.has(t.category_id))
   const manual = db.manualBills.filter((b: any) => billCycleKey(b.due_date, N) === key)
   const paid = db.fixedPaid.filter((p: any) => p.cycle_key === key)
   const fixedById = Object.fromEntries(db.fixed.map((f: any) => [f.id, f]))
   const sum = (a: any[], f = (x: any) => Number(x.amount)) => a.reduce((s, x) => s + f(x), 0)
   const entradas = sum(ins)
-  const cardOut = sum(outs.filter((t: any) => t.payment === 'credito'))
+  const cardOut = sum(spendOuts.filter((t: any) => t.payment === 'credito'))
   const manualOut = sum(manual)
   const fixedOut = sum(paid)
   const odPending = (db.overdraft || []).filter((o: any) => Number(o.used_amount) > 0 && cycleKeyOf(overdraftPayDate(o, today, S), S) === key).map((o: any) => ({ ...o, payDate: overdraftPayDate(o, today, S), amount: Number(o.used_amount) }))
   const odOut = sum(odPending)
-  const saidas = sum(outs) + manualOut + fixedOut + odOut
+  const loanInst = (db.loans || []).flatMap(loanInstallments)
+  const loanInCycle = loanInst.filter((x: any) => cycleKeyOf(x.due, S) === key)
+  const loanPaid = loanInCycle.filter((x: any) => x.paidOn)
+  const loanPending = loanInCycle.filter((x: any) => !x.paidOn)
+  const loanPaidOut = sum(loanPaid)
+  const pendingLoanSum = sum(loanPending)
+  const saidas = sum(spendOuts) + manualOut + fixedOut + odOut + loanPaidOut
   const pendingFixed = db.fixed.filter((f: any) => !paid.find((p: any) => p.fixed_id === f.id))
   const pendingFixedSum = sum(pendingFixed)
   const byCat: Record<string, number> = {}
-  outs.forEach((t: any) => { const k = t.category_id || 'none'; byCat[k] = (byCat[k] || 0) + Number(t.amount) })
+  spendOuts.forEach((t: any) => { const k = t.category_id || 'none'; byCat[k] = (byCat[k] || 0) + Number(t.amount) })
   paid.forEach((p: any) => { const k = fixedById[p.fixed_id]?.category_id || 'none'; byCat[k] = (byCat[k] || 0) + Number(p.amount) })
   if (manualOut) byCat['manual'] = (byCat['manual'] || 0) + manualOut
   if (odOut) byCat['cheque'] = (byCat['cheque'] || 0) + odOut
@@ -64,7 +88,7 @@ export function cycleData(db: DBx, key: string, today: string) {
   const macro = { viver: 0, crescer: 0, curtir: 0 }
   Object.entries(byCat).forEach(([k, v]) => { const m = catById[k]?.macro || 'viver'; (macro as any)[m] += v })
   const leisureIds = new Set(db.categories.filter((c: any) => c.is_leisure).map((c: any) => c.id))
-  const leisureGroups = new Set(outs.filter((t: any) => leisureIds.has(t.category_id)).map((t: any) => t.group_id || t.id))
+  const leisureGroups = new Set(spendOuts.filter((t: any) => leisureIds.has(t.category_id)).map((t: any) => t.group_id || t.id))
   const leisureCount = leisureGroups.size
   // faturas do ciclo por cartão
   const bills: CardBill[] = []
@@ -82,7 +106,7 @@ export function cycleData(db: DBx, key: string, today: string) {
   const daysTotal = diffDays(range.start, range.end) + 1
   const dayN = isCurrent ? diffDays(range.start, today) + 1 : (today > range.end ? daysTotal : 0)
   const daysLeft = isCurrent ? diffDays(today, range.end) + 1 : 0
-  const free = cap > 0 ? cap - saidas - pendingFixedSum : null
+  const free = cap > 0 ? cap - saidas - pendingFixedSum - pendingLoanSum : null
   const perDay = free != null && daysLeft > 0 ? Math.max(0, free) / daysLeft : null
   // adiantamentos: pegos no ciclo anterior descontam do salário deste ciclo
   const incomeRows = db.income.map((s: any) => {
@@ -95,7 +119,7 @@ export function cycleData(db: DBx, key: string, today: string) {
     const real = ins.filter((t: any) => t.income_source_id === s.id && !t.is_advance && !t.auto)
     return { source: s, expected, adv, advs, net: Math.max(0, expected - adv), received, missing: Math.max(0, expected - adv - received), auto, pending, real }
   })
-  return { key, range, txs, realTxs, autoSal, salPending, odPending, odOut, ins, outs, manual, paid, entradas, saidas, saldo: entradas - saidas, cardOut, manualOut, fixedOut, pendingFixed, pendingFixedSum, byCat, macro, leisureCount, bills, cap, isCurrent, daysTotal, dayN, daysLeft, free, perDay, incomeRows }
+  return { key, range, txs, realTxs, autoSal, salPending, odPending, odOut, ins, outs, spendOuts, payOuts, manual, paid, entradas, saidas, saldo: entradas - saidas, cardOut, manualOut, fixedOut, pendingFixed, pendingFixedSum, byCat, macro, leisureCount, bills, cap, isCurrent, daysTotal, dayN, daysLeft, free, perDay, incomeRows, loanInst, loanInCycle, loanPaid, loanPending, loanPaidOut, pendingLoanSum }
 }
 /** Faturas (de qualquer ciclo) que vencem entre hoje e hoje+3. */
 export function billsDueSoon(db: DBx, today: string) {
@@ -165,4 +189,21 @@ export function nextSummary(db: DBx, key: string, today: string) {
   const outrasJa = cd.realTxs.filter((t: any) => t.kind === 'saida' && t.payment !== 'credito').reduce((a: number, t: any) => a + Number(t.amount), 0)
   const comprometido = faturas + fixos + cheque + outrasJa
   return { key: nk, cards: Object.values(byCard), faturas, fixos, cheque, outrasJa, salarios, entradas, comprometido, sobra: entradas - comprometido }
+}
+
+/** Categoria "Combustível" (nome, sem acento, minúsculas). */
+export function isFuelCat(c: any) {
+  return !!c && String(c.name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') === 'combustivel'
+}
+export function fuelCatId(db: any) { return db?.categories?.find((c: any) => isFuelCat(c))?.id || null }
+/** Totais de combustível do ciclo, separados por moto e carro. */
+export function fuelSplit(outs: any[], catId: string | null) {
+  let moto = 0, carro = 0
+  if (!catId) return { moto, carro }
+  for (const t of outs) {
+    if (t.category_id !== catId) continue
+    if (t.vehicle === 'moto') moto += Number(t.amount) || 0
+    else if (t.vehicle === 'carro') carro += Number(t.amount) || 0
+  }
+  return { moto, carro }
 }

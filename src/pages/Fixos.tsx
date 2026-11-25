@@ -3,7 +3,7 @@ import { useData } from '../data'
 import { Header, CycleBanner, Seg, DIN, Ic, More, editDel, Check, Add, Note, Bar, useForm, Empty } from '../ui'
 import { cycleData } from '../lib/calc'
 import { brl, ddmm } from '../lib/fmt'
-import { cycleName, shiftKey, cycleRange, diffDays, parts, ds, monthLen } from '../lib/cycle'
+import { cycleName, cycleRange, diffDays, parts, ds, monthLen } from '../lib/cycle'
 import { ICON_NAMES } from '../icons'
 
 const FIX_ICONS: Record<string, string> = { repeat: 'Geral', bolt: 'Luz', drop: 'Água', wifi: 'Internet', phone: 'Celular', church: 'Igreja', globe: 'Missão', house: 'Casa', car: 'Carro', heart: 'Coração', card: 'Cartão', piggy: 'Cofrinho', pill: 'Remédio', cart: 'Mercado' }
@@ -51,7 +51,7 @@ export default function Fixos() {
           </div> })}
         <Add label="Adicionar gasto fixo" onClick={() => openEdit()} /><div style={{ height: 8 }} />
       </div>
-      <Note icon="repeat" t={`No dia ${startDay}, no ciclo novo, voltam desmarcados`} d={`Marque quando pagar. Toque em um fixo para mudar nome, valor ou dia, ou apagar. ${cycleName(shiftKey(key, 1), naming)} começa sem nenhum marcado.`} />
+      <Note icon="repeat" t={`No ciclo novo, voltam desmarcados`} d={`O normal é no dia ${startDay}. Se o salário cair antes e o mês novo começar mais cedo, os fixos também recomeçam nesse dia. Marque quando pagar.`} />
       <Note icon="card" t="Faturas ficam em Cartões" d="Como mudam todo mês, não entram como fixos." />
     </div>
     {form}

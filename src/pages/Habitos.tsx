@@ -17,7 +17,17 @@ export default function Habitos() {
   const grid = habits.filter((h: any) => h.in_grid && (h.kind !== 'phone' || db!.hh.max_phone_hours != null))
   const born = (h: any) => (h.created_at ? new Date(h.created_at).toLocaleDateString('sv-SE') : '2000-01-01')
   const sched = (h: any, d: string) => d >= born(h) && (h.days || []).includes(dow(d))
-  const dayStat = (d: string) => { const s = grid.filter((h: any) => sched(h, d)); const n = s.filter((h: any) => { const l = logOf(h.id, d); return l && l.done }).length; return { s: s.length, n } }
+  const dayStat = (d: string) => {
+    const s = grid.filter((h: any) => {
+      if (!sched(h, d)) return false
+      const l = logOf(h.id, d)
+      if (h.kind === 'phone') return !!l // celular só entra quando ela marca Dentro ou Passei
+      if (d === today) return !!l?.done // hoje só conta o que já foi feito
+      return true
+    })
+    const n = s.filter((h: any) => logOf(h.id, d)?.done).length
+    return { s: s.length, n }
+  }
   const pct = (d: string) => { const x = dayStat(d); return x.s ? x.n / x.s : null }
   // semana seg–dom
   const mon = addDays(today, -((dow(today) + 6) % 7)); const week = Array.from({ length: 7 }, (_, i) => addDays(mon, i))
@@ -67,7 +77,9 @@ export default function Habitos() {
           {grid.map((h: any) => <div key={h.id} style={{ display: 'contents' }}><div style={{ fontSize: 12, fontWeight: 500, lineHeight: 1.2, paddingRight: 4 }}>{h.kind === 'phone' && maxH ? `Máx. ${String(maxH).replace('.', ',')}h de celular` : h.name}</div>
             {week.map((d) => { const l = logOf(h.id, d); const s = sched(h, d); const fut = d > today
               const st: any = { width: 22, height: 22, borderRadius: 6, display: 'grid', placeItems: 'center' }
-              return <div key={d} style={{ display: 'grid', placeItems: 'center' }}><button type="button" aria-label={`${h.name} ${d}`} disabled={fut || !s} onClick={() => toggle(h, d)} style={fut || !s ? { ...st, background: '#F1EFEB', opacity: s ? 1 : 0.5 } : l?.done ? { ...st, background: 'var(--acc)', color: '#fff' } : l && !l.done ? { ...st, background: 'var(--negS)' } : d === today ? { ...st, border: '1.5px solid #CFCCC5', background: '#fff' } : { ...st, background: 'var(--negS)', opacity: 0.6 }}>{l?.done ? <Icon n="check" s={12} sw={2.6} /> : (!fut && s && d !== today) || (l && !l.done) ? <i style={{ width: 8, height: 1.5, background: 'var(--neg)', display: 'block' }} /> : null}</button></div> })}</div>)}
+              const phoneOpen = h.kind === 'phone' && !l
+              const pending = d === today || phoneOpen
+              return <div key={d} style={{ display: 'grid', placeItems: 'center' }}><button type="button" aria-label={`${h.name} ${d}`} disabled={fut || !s} onClick={() => toggle(h, d)} style={fut || !s ? { ...st, background: '#F1EFEB', opacity: s ? 1 : 0.5 } : l?.done ? { ...st, background: 'var(--acc)', color: '#fff' } : l && !l.done ? { ...st, background: 'var(--negS)' } : pending ? { ...st, border: '1.5px solid #CFCCC5', background: '#fff' } : { ...st, background: 'var(--negS)', opacity: 0.6 }}>{l?.done ? <Icon n="check" s={12} sw={2.6} /> : (!fut && s && !pending) || (l && !l.done) ? <i style={{ width: 8, height: 1.5, background: 'var(--neg)', display: 'block' }} /> : null}</button></div> })}</div>)}
         </div>}
       </div>
       {routine('manha', 'Rotina da manhã', 'sun', '')}

@@ -7,6 +7,7 @@ import { installmentDues, splitInstallments, dow, parts, addDays, cycleName, bil
 import { brl, ddmm, PAY_LABEL } from './lib/fmt'
 import { sb } from './lib/sb'
 import { occurs } from './pages/Tarefas'
+import { isFuelCat } from './lib/calc'
 
 const SR: any = typeof window !== 'undefined' ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition : null
 const FQ: Record<string, string> = { diaria: 'Todo dia', semanal: 'Toda semana', quinzenal: 'A cada 15 dias', mensal: 'Todo mês', urgente: 'Urgente' }
@@ -16,7 +17,10 @@ function uuid() { return (crypto as any).randomUUID ? crypto.randomUUID() : 'xxx
 /** O que falta para salvar o item (vazio = pronto). */
 function missing(i: VItem, db: any): string | null {
   switch (i.kind) {
-    case 'gasto': return !i.description ? 'falta o que foi' : !(i.amount! > 0) ? 'falta o valor' : !i.payment ? 'falta a forma de pagamento' : i.payment === 'credito' && !i.cardId ? 'falta o cartão' : null
+    case 'gasto': {
+      const cat = db.categories.find((c: any) => c.id === i.categoryId)
+      return !i.description ? 'falta o que foi' : !(i.amount! > 0) ? 'falta o valor' : !i.payment ? 'falta a forma de pagamento' : i.payment === 'credito' && !i.cardId ? 'falta o cartão' : isFuelCat(cat) && i.vehicle !== 'moto' && i.vehicle !== 'carro' ? 'moto ou carro?' : null
+    }
     case 'fatura': return !i.cardId ? 'falta o cartão' : !(i.amount! > 0) ? 'falta o valor' : !i.due ? 'falta o mês' : null
     case 'wish': return !(i.amount! > 0) ? 'falta o valor' : null
     case 'entrada': return !(i.amount! > 0) ? 'falta o valor' : null
@@ -27,7 +31,7 @@ function missing(i: VItem, db: any): string | null {
 function view(i: VItem, db: any, naming: any): { icon: string; k: string; t: string; d: string } {
   const card = (id: string | null) => db.cards.find((c: any) => c.id === id)?.name || ''
   switch (i.kind) {
-    case 'gasto': { const c = db.categories.find((x: any) => x.id === i.categoryId); return { icon: catIcon(c?.name), k: 'Gasto', t: i.description || '—', d: [i.amount ? brl(i.amount) : null, i.payment === 'credito' ? `${card(i.cardId) || 'cartão?'}${i.installments > 1 ? ` ${i.installments}x` : ''}` : i.payment ? PAY_LABEL[i.payment] : null, c?.name, i.date !== db.__today ? ddmm(i.date) : null].filter(Boolean).join(' · ') } }
+    case 'gasto': { const c = db.categories.find((x: any) => x.id === i.categoryId); return { icon: catIcon(c?.name), k: 'Gasto', t: i.description || '—', d: [i.amount ? brl(i.amount) : null, i.payment === 'credito' ? `${card(i.cardId) || 'cartão?'}${i.installments > 1 ? ` ${i.installments}x` : ''}` : i.payment ? PAY_LABEL[i.payment] : null, c?.name, i.vehicle === 'moto' ? 'moto' : i.vehicle === 'carro' ? 'carro' : null, i.date !== db.__today ? ddmm(i.date) : null].filter(Boolean).join(' · ') } }
     case 'fatura': return { icon: 'card', k: 'Fatura do cartão', t: `${card(i.cardId) || 'Cartão?'}${i.due ? ` · vence ${ddmm(i.due)}` : ''}`, d: `${i.amount ? brl(i.amount) : 'sem valor'}${i.due ? ` · valor manual · ciclo ${cycleName(billCycleKey(i.due, naming), naming)}` : ''}` }
     case 'habito': return { icon: 'flame', k: 'Hábito feito hoje', t: db.habits.find((h: any) => h.id === i.habitId)?.name || '', d: `você disse "${i.text}"` }
     case 'tarefa_feita': return { icon: 'check', k: 'Tarefa feita', t: db.tasks.find((h: any) => h.id === i.taskId)?.name || '', d: `você disse "${i.text}"` }
@@ -65,13 +69,14 @@ export function Voz({ onClose }: { onClose: () => void }) {
     const it = items![i]
     const cardOpts = db!.cards.map((c: any) => ({ v: c.id, l: c.name }))
     const done = (patch: any) => { setAt(i, { ...it, ...patch } as VItem); return true }
-    if (it.kind === 'gasto') return setForm({ title: 'Gasto', initial: { description: it.description, amount: it.amount ?? '', categoryId: it.categoryId || '', payment: it.payment || '', cardId: it.cardId || '', installments: it.installments, date: it.date }, fields: [
+    if (it.kind === 'gasto') return setForm({ title: 'Gasto', initial: { description: it.description, amount: it.amount ?? '', categoryId: it.categoryId || '', payment: it.payment || '', cardId: it.cardId || '', installments: it.installments, date: it.date, vehicle: it.vehicle || '' }, fields: [
       { k: 'description', label: 'O que foi', type: 'text', required: true }, { k: 'amount', label: 'Valor', type: 'money', required: true, positive: true },
       { k: 'categoryId', label: 'Categoria', type: 'select', options: db!.categories.map((c: any) => ({ v: c.id, l: c.name })) },
+      { k: 'vehicle', label: 'Moto ou carro?', type: 'ops', options: [{ v: 'moto', l: 'Moto' }, { v: 'carro', l: 'Carro' }] },
       { k: 'payment', label: 'Pagamento', type: 'ops', options: ['dinheiro', 'pix', 'debito', 'credito'].map((v) => ({ v, l: PAY_LABEL[v] })) },
       { k: 'cardId', label: 'Cartão', type: 'select', options: cardOpts }, { k: 'installments', label: 'Parcelas', type: 'number', min: 1, max: 48 }, { k: 'date', label: 'Data', type: 'date', required: true }],
-      show: (v) => ({ cardId: v.payment === 'credito', installments: v.payment === 'credito' }),
-      onSave: (v) => done({ description: v.description, amount: v.amount, categoryId: v.categoryId || null, payment: v.payment || null, cardId: v.cardId || null, installments: Math.max(1, Number(v.installments) || 1), date: v.date }) })
+      show: (v) => ({ cardId: v.payment === 'credito', installments: v.payment === 'credito', vehicle: isFuelCat(db!.categories.find((c: any) => c.id === v.categoryId)) }),
+      onSave: (v) => done({ description: v.description, amount: v.amount, categoryId: v.categoryId || null, payment: v.payment || null, cardId: v.cardId || null, installments: Math.max(1, Number(v.installments) || 1), date: v.date, vehicle: v.vehicle || null }) })
     if (it.kind === 'fatura') { const dues = Array.from({ length: 8 }, (_, k) => { const p = parts(today); const t = new Date(p.y, p.m - 1 + k, 1); return t }).map((t) => ({ y: t.getFullYear(), m: t.getMonth() + 1 }))
       return setForm({ title: 'Fatura do cartão', initial: { cardId: it.cardId || '', ym: it.due ? it.due.slice(0, 7) : '', amount: it.amount ?? '' }, fields: [
         { k: 'cardId', label: 'Cartão', type: 'select', required: true, options: cardOpts },
@@ -99,8 +104,8 @@ export function Voz({ onClose }: { onClose: () => void }) {
       case 'gasto': {
         if (it.payment === 'credito') { const card = db!.cards.find((c: any) => c.id === it.cardId); const n = it.installments || 1
           const dues = installmentDues(it.date, card.closing_day, card.due_day, n); const ps = splitInstallments(it.amount!, n); const g = uuid()
-          return !!(await ins('tx', dues.map((due, k) => ({ kind: 'saida', description: it.description, amount: ps[k], date: it.date, category_id: it.categoryId, payment: 'credito', card_id: card.id, bill_due: due, installment_no: k + 1, installments: n, group_id: g, total_amount: it.amount })))) }
-        return !!(await ins('tx', { kind: 'saida', description: it.description, amount: it.amount, date: it.date, category_id: it.categoryId, payment: it.payment })) }
+          return !!(await ins('tx', dues.map((due, k) => ({ kind: 'saida', description: it.description, amount: ps[k], date: it.date, category_id: it.categoryId, payment: 'credito', card_id: card.id, bill_due: due, installment_no: k + 1, installments: n, group_id: g, total_amount: it.amount, vehicle: it.vehicle || null })))) }
+        return !!(await ins('tx', { kind: 'saida', description: it.description, amount: it.amount, date: it.date, category_id: it.categoryId, payment: it.payment, vehicle: it.vehicle || null })) }
       case 'fatura': { const ex = db!.manualBills.find((b: any) => b.card_id === it.cardId && b.due_date === it.due)
         return ex ? upd('manualBills', ex.id, { amount: it.amount }) : !!(await ins('manualBills', { card_id: it.cardId, due_date: it.due, amount: it.amount, note: 'pelo áudio' })) }
       case 'habito': { const { error } = await sb.from('tp_habit_logs').upsert({ habit_id: it.habitId, day: today, done: true, household_id: db!.hh.id }, { onConflict: 'habit_id,day' }); if (error) { toast(error.message); return false } await reload('habitLogs'); return true }
@@ -138,7 +143,7 @@ export function Voz({ onClose }: { onClose: () => void }) {
       {items.length === 0 && <div className="note warn"><Icon n="info" /><div className="d">Não achei nada. Volte e fale de novo.</div></div>}
       <div className="card" style={{ padding: '2px 14px', marginBottom: 10 }}>{items.map((it, i) => { const v = view(it, dbv, naming); const m = missing(it, db)
         return <div key={i} className="li vz" data-kind={it.kind}><Ic n={v.icon} style={it.kind === '?' ? { background: 'var(--negS)', color: 'var(--neg)' } : undefined} />
-          <div style={{ minWidth: 0, flex: 1 }}><div className="lbl" style={{ fontSize: 10.5, textTransform: 'uppercase', letterSpacing: 0.3 }}>{v.k}</div><div className="t">{v.t}</div><div className="d n">{v.d}</div>{m && <span className={'tag ' + (it.kind === '?' ? 'neg' : 'warn')} style={{ marginTop: 4 }}>{m}</span>}</div>
+          <div style={{ minWidth: 0, flex: 1 }}><div className="lbl" style={{ fontSize: 10.5, textTransform: 'uppercase', letterSpacing: 0.3 }}>{v.k}</div><div className="t">{v.t}</div><div className="d n">{v.d}</div>{m === 'moto ou carro?' ? <div className="row" style={{ gap: 5, marginTop: 6 }}>{(['moto', 'carro'] as const).map((x) => <button type="button" key={x} className="tag acc" onClick={() => setAt(i, { ...it, vehicle: x } as VItem)}>{x === 'moto' ? 'Moto' : 'Carro'}</button>)}</div> : m && <span className={'tag ' + (it.kind === '?' ? 'neg' : 'warn')} style={{ marginTop: 4 }}>{m}</span>}</div>
           <button type="button" className="ib" style={{ width: 32, height: 32 }} aria-label="editar" onClick={() => edit(i)}><Icon n="edit" s={15} /></button>
           <button type="button" className="ib" style={{ width: 32, height: 32 }} aria-label="remover" onClick={() => setAt(i, null)}><Icon n="x" s={15} /></button>
         </div> })}</div>
