@@ -6,9 +6,10 @@ import { cycleData, fuelSplit } from '../lib/calc'
 import { brl } from '../lib/fmt'
 import { learn } from '../lancar'
 import { cycleName } from '../lib/cycle'
+import { goalBarLabel } from '../lib/amigo'
 
 export default function Metas() {
-  const ctx = useData(); const { db, key, today, naming, upd, updHH, toast } = ctx
+  const ctx = useData(); const { db, key, today, naming, upd, updHH, ins, toast } = ctx
   const cd = useMemo(() => cycleData(db, key, today), [db, key, today])
   const [form, setForm] = useForm()
   const [macroOpen, setMacroOpen] = useState<string | null>(null)
@@ -16,16 +17,23 @@ export default function Metas() {
   const goals = db!.categories.filter((c: any) => c.goal != null)
   const macroGoal = (m: string) => db!.categories.filter((c: any) => c.macro === m && c.goal != null).reduce((s: number, c: any) => s + Number(c.goal), 0)
   const capForm = () => setForm({ title: 'Teto do ciclo', initial: { cap: Number(hh.month_cap) || '', leisure_max: hh.leisure_max }, fields: [{ k: 'cap', label: 'Quanto podemos gastar por ciclo (tudo somado)', type: 'money', hint: 'Usado no "Livre para gastar" do Início. Deixe vazio para não usar.' }, { k: 'leisure_max', label: 'Saídas de lazer por ciclo', type: 'number', min: 0, max: 30 }], onSave: (v) => updHH({ month_cap: v.cap ?? 0, leisure_max: v.leisure_max ?? 3 }) })
+  const catGoalForm = () => setForm({ title: 'Nova categoria e meta', initial: { macro: 'viver' }, fields: [
+    { k: 'name', label: 'Nome da categoria', type: 'text', required: true },
+    { k: 'macro', label: 'Grupo', type: 'ops', options: [{ v: 'viver', l: 'Viver' }, { v: 'crescer', l: 'Crescer' }, { v: 'curtir', l: 'Curtir' }] },
+    { k: 'goal', label: 'Limite por ciclo', type: 'money', required: true }],
+    onSave: async (v) => !!(await ins('categories', { name: v.name, macro: v.macro || 'viver', goal: v.goal, is_leisure: v.macro === 'curtir', sort: db!.categories.length + 1 })) })
   const goalForm = (c?: any) => setForm({ title: c ? `Meta · ${c.name}` : 'Nova meta', initial: c ? { category_id: c.id, goal: Number(c.goal) } : {}, fields: [
     { k: 'category_id', label: 'Categoria', type: 'select', required: true, options: db!.categories.filter((x: any) => c ? x.id === c.id : x.goal == null).map((x: any) => ({ v: x.id, l: x.name })) },
     { k: 'goal', label: 'Meta por ciclo', type: 'money', required: true }],
-    onSave: (v) => upd('categories', v.category_id, { goal: v.goal }), onDelete: c ? () => upd('categories', c.id, { goal: null }) : undefined })
+    onSave: (v) => upd('categories', v.category_id, { goal: v.goal }), onDelete: c ? () => upd('categories', c.id, { goal: null }) : undefined,
+    children: c ? undefined : <button type="button" className="add" style={{ width: '100%', marginBottom: 8 }} onClick={() => catGoalForm()}>+ Criar categoria</button> })
   const setAlert = (k: string) => updHH({ alerts: { ...al, [k]: al[k] === false } })
   const pctDay = cd.isCurrent ? (cd.dayN / cd.daysTotal) * 100 : 100
   const used = cd.cap ? (cd.saidas / cd.cap) * 100 : 0
   return <>
     <Header /><div className="ttl">Dinheiro</div><Seg items={DIN} /><CycleBanner />
     <div className="wrap">
+      {goals.map((c: any) => { const v = cd.byCat[c.id] || 0; const g = Number(c.goal); const p = g ? v / g : 0; if (p < 0.95) return null; return <div key={'n'+c.id} className={'note ' + (p > 1 ? 'neg' : 'warn')}><Icon n="alert" /><div><div className="t">{p > 1 ? `Passou do limite de ${c.name}` : `${Math.round(p * 100)}% do limite de ${c.name}`}</div><div className="d">{goalBarLabel(v, g)}{cd.daysLeft ? ` · faltam ${cd.daysLeft} dias` : ''}</div></div></div> })}
       <div className="card tap" onClick={capForm}><div className="row"><div><div className="lbl">Teto de {cycleName(key, naming).toLowerCase()}</div><div className="n" style={{ fontSize: 24, fontWeight: 650, letterSpacing: -0.5 }}>{cd.cap ? brl(cd.cap) : 'Sem teto'}</div></div><span className="sp" style={{ color: 'var(--mut2)' }}><Icon n="edit" s={16} /></span></div>
         {cd.cap > 0 ? <><div className="bar" style={{ margin: '10px 0 6px', overflow: 'visible' }}><i style={{ width: `${Math.min(100, used)}%`, background: used > 100 ? 'var(--neg)' : 'var(--ink2)' }} /><b style={{ position: 'absolute', left: `${pctDay}%`, top: -4, width: 2, height: 14, background: 'var(--acc)', borderRadius: 2 }} /></div>
           <div className="row lbl n"><span>Gasto {brl(cd.saidas, false)} · {Math.round(used)}%</span><span className="sp row" style={{ gap: 5 }}><i style={{ width: 2, height: 10, background: 'var(--acc)', display: 'inline-block' }} />hoje = {Math.round(pctDay)}% do ciclo</span></div></>
@@ -42,7 +50,7 @@ export default function Metas() {
           return <div key={c.id} className="li tap" style={{ display: 'block' }} onClick={() => goalForm(c)}>
             <div className="row" style={{ marginBottom: 6 }}><span className="t">{c.name}</span><span className="sp" />{p > 100 ? <span className="tag neg n">+{brl(v - g, false)}</span> : p >= 90 ? <span className="tag warn n">{Math.round(p)}%</span> : <span className="lbl n">{Math.round(p)}%</span>}<More items={[{ label: 'Editar', icon: 'edit', onClick: () => goalForm(c) }, { label: 'Tirar meta', icon: 'trash', neg: true, onClick: () => upd('categories', c.id, { goal: null }) }]} /></div>
             <div className="bar t"><i style={{ width: `${Math.min(100, p)}%`, background: col }} /></div>
-            <div className="lbl n" style={{ marginTop: 5 }}><b style={{ color: 'var(--ink)', fontWeight: 600 }}>{brl(v, false)}</b> de {brl(g, false)} · {MACRO_LABEL[c.macro]}</div>
+            <div className="lbl n" style={{ marginTop: 5 }}><b style={{ color: 'var(--ink)', fontWeight: 600 }}>{goalBarLabel(v, g)}</b> · {MACRO_LABEL[c.macro]}</div>
             {(() => { const f = fuelSplit(cd.outs, c.id); return (f.moto > 0 || f.carro > 0) ? <div className="lbl n" style={{ marginTop: 2 }}>Moto {brl(f.moto, false)} · Carro {brl(f.carro, false)}</div> : null })()}
           </div> })}
         <Add label="Nova meta" onClick={() => goalForm()} /><div style={{ height: 8 }} />

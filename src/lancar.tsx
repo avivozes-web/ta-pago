@@ -9,6 +9,7 @@ const defaultStart = (key: string, startDay: number) => { const { y, m } = keyPa
 import { brl, ddmm, moneyIn, moneyOut, PAY_LABEL } from './lib/fmt'
 import { sb } from './lib/sb'
 import { txCycleKey, needsVehicle } from './lib/calc'
+import { Tutorial } from './onboard'
 
 export async function learn(ctx: any, description: string, categoryId: string | null) {
   if (!categoryId) return
@@ -82,7 +83,7 @@ export function Lancar({ onClose, init }: { onClose: () => void; init?: LancarIn
     } finally { setBusy(false) }
   }
   const inp = { className: 'fi', style: { padding: '7px 9px', fontSize: 13 } }
-  return <Sheet title={init?.quick ? init.quick.label : mode === 'saida' ? 'Novo gasto' : 'Nova entrada'} onClose={onClose} right={
+  return <><Sheet title={init?.quick ? init.quick.label : mode === 'saida' ? 'Novo gasto' : 'Nova entrada'} onClose={onClose} right={
     <div style={{ display: 'flex', background: '#ECEAE5', borderRadius: 9, padding: 3, fontSize: 12, fontWeight: 500 }}>
       {(['saida', 'entrada'] as const).map((m) => <button type="button" key={m} onClick={() => setMode(m)} style={m === mode ? { background: '#fff', padding: '4px 12px', borderRadius: 7, fontWeight: 600, boxShadow: '0 1px 2px rgba(0,0,0,.08)' } : { padding: '4px 12px', color: 'var(--mut)' }}>{m === 'saida' ? 'Gasto' : 'Entrada'}</button>)}
     </div>}>
@@ -113,6 +114,8 @@ export function Lancar({ onClose, init }: { onClose: () => void; init?: LancarIn
     <button type="button" className="btn" disabled={busy} onClick={save}>{busy ? 'Salvando…' : mode === 'saida' ? 'Salvar gasto' : 'Salvar entrada'}</button>
     <button type="button" className="btn l" style={{ width: '100%', marginTop: 8 }} onClick={() => { onClose(); nav('/dinheiro/posso-comprar') }}>Posso comprar?</button>
   </Sheet>
+  <Tutorial part="lancar" />
+</>
 }
 
 /** Editar um lançamento já salvo (todas as parcelas juntas, se for parcelado). */

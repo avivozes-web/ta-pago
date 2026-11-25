@@ -3,6 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { Icon } from './icons'
 import { useData } from './data'
 import { cycleName, cycleRange, keyParts, shiftKey, cycleKeyOf } from './lib/cycle'
+import { inboxMessages, unseenCount } from './lib/amigo'
 import { ddmm, moneyIn, moneyOut } from './lib/fmt'
 import { norm } from './lib/parse'
 
@@ -128,9 +129,11 @@ export function Header() {
     <button type="button" className="cyc" onClick={() => setOpen(!open)} aria-label="trocar ciclo">
       <div><div className="a">{cycleName(key, naming)}{yr(key)}</div><div className="b n">{cycleRng(key, startDay)}</div></div><Icon n="down" />
     </button>
+    <InboxBtn />
     <button type="button" className="ib" aria-label="falar" title="Falar (áudio)" style={{ background: 'var(--ink)', color: '#fff', borderColor: 'var(--ink)' }} onClick={() => window.dispatchEvent(new CustomEvent('tp:open', { detail: { voz: true } }))}><Icon n="mic" /></button>
+    <button type="button" className="ib" aria-label="ajuda" title="Ajuda" onClick={() => window.dispatchEvent(new CustomEvent('tp:help'))}><Icon n="help" /></button>
     <button type="button" className="ib" aria-label="ajustes" onClick={() => nav('/ajustes')}><Icon n="gear" /></button>
-    {open && <><div style={{ position: 'fixed', inset: 0, zIndex: 25 }} onClick={() => setOpen(false)} /><div className="cycsel" style={{ right: 100 }}>
+    {open && <><div style={{ position: 'fixed', inset: 0, zIndex: 25 }} onClick={() => setOpen(false)} /><div className="cycsel" style={{ right: 170 }}>
       {keys.map((k) => <button type="button" key={k} className={k === key ? 'on' : ''} onClick={() => { setKey(k); setOpen(false) }}>
         <div className="row"><span>{cycleName(k, naming)}{yr(k)}</span><span className="sp lbl">{k === currentKey ? 'atual' : k < currentKey ? 'arquivado' : 'futuro'}</span></div>
         <div className="lbl n">{cycleRng(k, startDay)}</div></button>)}
@@ -154,3 +157,36 @@ export function catIcon(name?: string) { const n = norm(name || ''); return CAT_
 export const MACRO_COLOR: Record<string, string> = { viver: 'var(--ink2)', crescer: 'var(--acc)', curtir: 'var(--gold)' }
 export const MACRO_LABEL: Record<string, string> = { viver: 'Viver', crescer: 'Crescer', curtir: 'Curtir' }
 export function Empty({ children }: { children: ReactNode }) { return <div className="empty">{children}</div> }
+
+function InboxBtn() {
+  const { db, today, key, updHH } = useData(); const nav = useNavigate()
+  const [open, setOpen] = useState(false)
+  if (!db) return <button type="button" className="ib" aria-label="avisos" disabled><Icon n="bell" /></button>
+  const msgs = inboxMessages(db, today, key)
+  const n = unseenCount(db, today, key)
+  const openBox = () => {
+    setOpen(true)
+    const seen = new Set(db.hh.inbox_seen || [])
+    msgs.forEach((m) => seen.add(m.id))
+    updHH({ inbox_seen: [...seen] })
+  }
+  const ignore = (id: string) => updHH({ inbox_ignored: [...(db.hh.inbox_ignored || []), id] })
+  return <>
+    <button type="button" className="ib" aria-label="avisos" title="Avisos" onClick={openBox}>
+      <Icon n="bell" />
+      {n > 0 && <span className="badge">{n > 9 ? '9+' : n}</span>}
+    </button>
+    {open && <Sheet title="Avisos" onClose={() => setOpen(false)}>
+      <div className="li" style={{ marginBottom: 6 }}><div><div className="t">Análises</div><div className="d">aparecem só aqui, no dia escolhido</div></div><Tog on={db.hh.analyses_on !== false} onClick={() => updHH({ analyses_on: db.hh.analyses_on === false })} /></div>
+      {msgs.length === 0 && <div className="empty">Nenhum aviso por agora.</div>}
+      {msgs.map((m) => <div key={m.id} className="li" style={{ alignItems: 'flex-start' }}>
+        <span className="dot" style={{ background: `var(--${m.lvl === 'acc' ? 'acc' : m.lvl})`, marginTop: 8 }} />
+        <div className="tap" style={{ minWidth: 0, flex: 1 }} onClick={() => { if (m.to) { setOpen(false); nav(m.to) } }}>
+          <div className="t">{m.t}</div>
+          <div className="d n">{m.d}</div>
+        </div>
+        {m.analysis && <button type="button" className="tag" onClick={() => ignore(m.id)}>Ignorar</button>}
+      </div>)}
+    </Sheet>}
+  </>
+}

@@ -2,10 +2,9 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useData } from '../data'
 import { Icon } from '../icons'
-import { Mark, Ic, More, editDel, Add, useForm, Sheet, MACRO_LABEL, cycleRng, Empty } from '../ui'
-import { brl } from '../lib/fmt'
+import { Mark, Ic, More, editDel, Add, useForm, Sheet, MACRO_LABEL, cycleRng, Empty, Tog } from '../ui'
 import { cycleName, billCycleKey, billDueFor, shiftKey, keyParts, ds } from '../lib/cycle'
-import { ddmm, PAY_LABEL } from '../lib/fmt'
+import { brl, ddmm, PAY_LABEL, DOW_LONG } from '../lib/fmt'
 import { quickList, QUICK_DEFAULT } from '../lib/quick'
 import { norm } from '../lib/parse'
 import { APP_VERSION } from '../lib/pwa'
@@ -76,6 +75,22 @@ export default function Ajustes() {
     <div className="hdr"><Mark /><button type="button" className="ib" style={{ marginLeft: 'auto' }} aria-label="fechar" onClick={() => nav(-1)}><Icon n="x" /></button></div>
     <div className="ttl">Ajustes</div>
     <div className="wrap">
+      <div className="sec">Como quer ser chamada</div>
+      <div className="card" style={{ padding: '2px 14px' }}>
+        <div className="li tap" onClick={() => setForm({ title: 'Como você quer ser chamada?', initial: { nickname: hh.nickname || '' }, fields: [{ k: 'nickname', label: 'Apelido', type: 'text', hint: 'Aparece no Início: Bom dia, apelido!' }], onSave: (v) => updHH({ nickname: (v.nickname || '').trim() }) })}><Ic n="user" /><div><div className="t">Apelido</div><div className="d">saudação no Início</div></div><span className="sp lbl n" style={{ color: 'var(--ink2)' }}>{hh.nickname || 'ainda não definido'}</span><span style={{ color: 'var(--mut2)' }}><Icon n="right" s={16} /></span></div>
+      </div>
+      <div className="sec">Análises</div>
+      <div className="card" style={{ padding: '2px 14px' }}>
+        <div className="li"><div><div className="t">Análises no sino</div><div className="d">contas simples, sem IA · só no sino</div></div><Tog on={hh.analyses_on !== false} onClick={() => updHH({ analyses_on: hh.analyses_on === false })} /></div>
+        <div className="li"><div><div className="t">Análise da semana</div><div className="d">{hh.analyses_weekly ? 'toda ' + DOW_LONG[hh.analyses_weekly_dow ?? 1] : 'desligada'}</div></div><Tog on={!!hh.analyses_weekly} onClick={() => updHH({ analyses_asked: true, analyses_weekly: !hh.analyses_weekly, analyses_weekly_dow: hh.analyses_weekly_dow ?? 1 })} /></div>
+        {!!hh.analyses_weekly && <div className="row" style={{ gap: 6, flexWrap: 'wrap', padding: '0 0 10px' }}>{DOW_LONG.map((l, i) => <button type="button" key={l} className={'op' + ((hh.analyses_weekly_dow ?? 1) === i ? ' on' : '')} onClick={() => updHH({ analyses_weekly_dow: i })}>{l}</button>)}</div>}
+        <div className="li"><div><div className="t">Análise do mês</div><div className="d">{hh.analyses_monthly ? 'todo dia ' + (hh.analyses_monthly_day || 15) : 'desligada'}</div></div><Tog on={!!hh.analyses_monthly} onClick={() => updHH({ analyses_asked: true, analyses_monthly: !hh.analyses_monthly, analyses_monthly_day: hh.analyses_monthly_day ?? 15 })} /></div>
+        {!!hh.analyses_monthly && <div className="li tap" onClick={() => setForm({ title: 'Dia da análise do mês', initial: { d: hh.analyses_monthly_day ?? 15 }, fields: [{ k: 'd', label: 'Dia (1 a 28)', type: 'number', required: true, min: 1, max: 28 }], onSave: (v) => updHH({ analyses_monthly_day: v.d }) })}><div className="t">Dia do mês</div><span className="sp lbl n">{hh.analyses_monthly_day ?? 15}</span></div>}
+      </div>
+      <div className="sec">Ajuda</div>
+      <div className="card" style={{ padding: '2px 14px' }}>
+        <div className="li tap" onClick={() => { updHH({ tutorials_seen: [] }); toast('Os tutoriais voltam a aparecer em cada parte.') }}><Ic n="help" /><div><div className="t">Ver tutoriais de novo</div><div className="d">são curtos, 2 ou 3 telas em cada parte</div></div></div>
+      </div>
       <div className="sec">Ciclo</div>
       <div className="card" style={{ padding: '4px 14px 12px' }}>
         <div className="li tap" onClick={() => setForm({ title: 'Ciclo começa no dia', initial: { d: startDay }, fields: [{ k: 'd', label: 'Dia em que o ciclo começa (dia do salário)', type: 'number', required: true, min: 1, max: 28 }], onSave: (v) => updHH({ cycle_start_day: v.d }) })}><Ic n="cal" /><div><div className="t">Começa no dia</div><div className="d">salário cai dia {startDay}</div></div><span className="sp lbl n" style={{ color: 'var(--ink2)' }}>dia {startDay}</span><span style={{ color: 'var(--mut2)' }}><Icon n="right" s={16} /></span></div>

@@ -19,6 +19,7 @@ import Tarefas from './pages/Tarefas'
 import Fechamento from './pages/Fechamento'
 import Ajustes from './pages/Ajustes'
 import { Mark } from './ui'
+import { FirstRun, Tutorial } from './onboard'
 
 function Nav() {
   const [open, setOpen] = useState<LancarInit | null>(null); const [voz, setVoz] = useState(false); const loc = useLocation()
@@ -59,6 +60,8 @@ function Shell() {
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
     <Nav />
+    <FirstRun />
+    <Tutorial />
     {msg && <div className="toast" role="status">{msg}</div>}
   </div>
 }

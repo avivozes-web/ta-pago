@@ -2,12 +2,14 @@ import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useData } from '../data'
 import { Icon } from '../icons'
-import { Header, CycleBanner, Ic, Bar, catIcon, MACRO_COLOR, Empty } from '../ui'
+import { Header, CycleBanner, Ic, Bar, catIcon, MACRO_COLOR, Empty, Sheet } from '../ui'
 import { cycleData, billsDueSoon, paceSeries, cashFlow, nextSummary, fuelSplit } from '../lib/calc'
 import { brl, ddmm, PAY_LABEL } from '../lib/fmt'
 import { cycleName, shiftKey, diffDays, ds, parts, monthLen, addDays } from '../lib/cycle'
 import { TxEdit, openLancar, openVoz } from '../lancar'
 import { quickList } from '../lib/quick'
+import { greeting, encouragement, healthScore, loggingStreak, biggestExpense, pequenoPesa, pesaLine, missingForGoal } from '../lib/amigo'
+import { savedInCycle } from '../lib/plan'
 
 export function alertsFor(db: any, cd: any) {
   const out: { lvl: 'neg' | 'warn'; t: string; d: string; to: string }[] = []
@@ -75,7 +77,15 @@ export default function Inicio() {
   const cd = useMemo(() => cycleData(db, key, today), [db, key, today])
   const prev = useMemo(() => cycleData(db, shiftKey(currentKey, -1), today), [db, currentKey, today])
   const soon = key === currentKey && db!.hh.alerts?.bills !== false ? billsDueSoon(db, today) : []
-  const alerts = alertsFor(db, cd)
+  const [how, setHow] = useState(false)
+  const hs = useMemo(() => healthScore(db, cd), [db, cd])
+  const saved = savedInCycle(db, key)
+  const miss = missingForGoal(db)
+  const big = biggestExpense(cd)
+  const pesa = pequenoPesa(cd.spendOuts || [], cd.dayN, cd.daysTotal)
+  const streak = loggingStreak(db, today)
+  const hi = greeting(db!.hh.nickname)
+  const word = encouragement(db, cd, today)
   const catBy = Object.fromEntries(db!.categories.map((c: any) => [c.id, c]))
   const cardBy = Object.fromEntries(db!.cards.map((c: any) => [c.id, c]))
   // fixos a pagar no ciclo (próximo vencimento dentro do ciclo)
@@ -91,6 +101,27 @@ export default function Inicio() {
   return <>
     <Header /><CycleBanner />
     <div className="wrap">
+      {hi && <div className="hi">{hi}</div>}
+      {key === currentKey && <div className="note"><Icon n="sparkle" /><div><div className="t">{word}</div></div></div>}
+      {key === currentKey && <div className="card" style={{ padding: 14 }}>
+        <div className="row"><span className="lbl">Saúde financeira</span><button type="button" className="sp linkbtn" onClick={() => setHow(true)}>Como é calculado</button></div>
+        <div className="score">{hs.score}</div>
+        <div className="lbl" style={{ marginBottom: 8 }}>de 0 a 100 · das suas contas, sem IA</div>
+        <Bar pct={hs.score} color={hs.score < 40 ? 'var(--neg)' : hs.score < 70 ? 'var(--warn)' : 'var(--acc)'} />
+      </div>}
+      {key === currentKey && <div className="g2">
+        <div className="stat"><div className="lbl">Dias lançando</div><div className="v">{streak} dia{streak === 1 ? '' : 's'}</div></div>
+        <div className="stat"><div className="lbl">Guardado neste ciclo</div><div className="v">{brl(saved, false)}</div></div>
+      </div>}
+      {key === currentKey && (miss || big) && <div className="g2">
+        {miss && <div className="stat"><div className="lbl">Falta para {miss.name}</div><div className="v">{brl(miss.left, false)}</div></div>}
+        {big && <div className="stat"><div className="lbl">Maior gasto do ciclo</div><div className="v">{brl(big.v, false)}</div><div className="lbl">{big.name}</div></div>}
+      </div>}
+      {key === currentKey && pesa[0] && <div className="card" style={{ padding: 14 }}>
+        <div className="ch"><h3>O pequeno pesa no ano</h3></div>
+        <div style={{ fontSize: 14, fontWeight: 600 }}>{pesaLine(pesa[0])}</div>
+        {pesa[1] && <div className="lbl" style={{ marginTop: 4 }}>{pesaLine(pesa[1])}</div>}
+      </div>}
       {key === currentKey && <Noite />}
       {key === currentKey && <Atalhos />}
       {soon.map((b) => { const n = diffDays(today, b.due); return <div key={b.card.id + b.due} className={'note ' + (n === 0 ? 'neg' : 'warn')}><Icon n="bell" /><div><div className="t">{n === 0 ? `Fatura ${b.card.name} vence HOJE` : `Fatura ${b.card.name} vence em ${n} dia${n > 1 ? 's' : ''} (${ddmm(b.due)})`}</div><div className="d n">{brl(b.amount)} · entra no ciclo {cycleName(b.due.slice(0, 7), naming)}</div></div></div> })}
@@ -107,8 +138,6 @@ export default function Inicio() {
         <div className="li" style={{ borderTop: '1px solid var(--line)' }}><div style={{ width: 32 }} /><div><div className="t" style={{ fontWeight: 600 }}>Saldo do ciclo</div></div><div className="v" style={{ fontSize: 15, color: cd.saldo < 0 ? 'var(--neg)' : undefined }}>{brl(cd.saldo)}</div></div>
       </div>
       {(() => { const f = cashFlow(db, key, today); const ns = nextSummary(db, key, today); return <Link to="/dinheiro/fluxo" className="card row" style={{ padding: '12px 14px', textDecoration: 'none' }}><Ic n="trend" /><div style={{ minWidth: 0 }}><div style={{ fontWeight: 600 }}>Fluxo de caixa</div><div className="lbl n">{f.negDays ? <span style={{ color: 'var(--neg)' }}>saldo fica negativo em {f.negDays} dia{f.negDays > 1 ? 's' : ''} · menor {brl(f.minBal, false)}</span> : `menor saldo previsto ${brl(f.minBal, false)} em ${ddmm(f.minDay)}`}</div><div className="lbl n">{cycleName(ns.key, naming)}: já comprometido {brl(ns.comprometido, false)} · sobra {brl(ns.sobra, false)}</div></div><span className="sp" style={{ color: 'var(--mut)' }}><Icon n="right" s={18} /></span></Link> })()}
-      {alerts.length > 0 && <div className="card" style={{ padding: '12px 14px 4px' }}><div className="ch"><h3>Alertas</h3><span className="sp tag neg">{alerts.length}</span></div>
-        {alerts.map((a, i) => <div key={i} className="li tap" onClick={() => nav(a.to)}><span className="dot" style={{ background: `var(--${a.lvl})` }} /><div><div className="t">{a.t}</div><div className="d n">{a.d}</div></div><span className="sp" style={{ color: 'var(--mut2)' }}><Icon n="right" s={16} /></span></div>)}</div>}
       <div className="card" style={{ padding: '12px 14px 6px' }}><div className="ch"><h3>Faturas deste ciclo</h3><Link to="/dinheiro/cartoes">Cartões</Link></div>
         {cd.bills.length === 0 && <Empty>Nenhuma fatura vence neste ciclo ainda.</Empty>}
         {cd.bills.map((b) => b.card.is_main && b.card.goal > 0 ? <div key={b.card.id + b.due} className="li" style={{ display: 'block' }}><div className="row"><div className="t" style={{ fontWeight: 600 }}>{b.card.name === 'BB' ? 'Banco do Brasil' : b.card.name}</div><span className="tag">vence {ddmm(b.due)}</span><b className="sp n">{brl(b.amount)}</b></div><div style={{ margin: '8px 0 5px' }}><Bar pct={(b.amount / b.card.goal) * 100} color={b.amount > b.card.goal ? 'var(--neg)' : undefined} /></div><div className="row lbl n"><span>{Math.round((b.amount / b.card.goal) * 100)}% da meta de {brl(Number(b.card.goal), false)}</span><span className="sp">limite {brl(Number(b.card.limit_amount), false)}</span></div></div>
@@ -123,6 +152,9 @@ export default function Inicio() {
       </div>
       {key === currentKey && <Link to="/fechamento" className="card row" style={{ padding: '12px 14px', textDecoration: 'none' }}><Ic n="flag" /><div><div style={{ fontWeight: 600 }}>Fechamento de {cycleName(prev.key, naming).toLowerCase()}</div><div className="lbl">{prev.txs.length || prev.paid.length ? `${prev.saldo >= 0 ? 'Sobraram' : 'Faltaram'} ${brl(Math.abs(prev.saldo), false)} · ver resumo` : 'Sem lançamentos · ver resumo'}</div></div><span className="sp" style={{ color: 'var(--mut)' }}><Icon n="right" s={18} /></span></Link>}
     </div>
+    {how && <Sheet title="Como é calculado" onClose={() => setHow(false)}>
+      {hs.how.map((x) => <div key={x} className="lbl" style={{ fontSize: 14, lineHeight: 1.45, marginBottom: 10, color: 'var(--ink)' }}>{x}</div>)}
+    </Sheet>}
     {edit && <TxEdit t={edit} onClose={() => setEdit(null)} />}
     {void startDay}
   </>

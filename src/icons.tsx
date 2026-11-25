@@ -55,6 +55,7 @@ const P: Record<string, string> = {
 "list": "<path d=\"M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01\"/>",
 "dl": "<path d=\"M12 4v11M7 10l5 5 5-5M5 20h14\"/>",
 "users": "<circle cx=\"9\" cy=\"8\" r=\"3.5\"/><path d=\"M2.5 20c1-3.5 3.5-5 6.5-5s5.5 1.5 6.5 5\"/><circle cx=\"17\" cy=\"9\" r=\"2.5\"/><path d=\"M17 14c2.5 0 4 1.5 4.5 4\"/>",
+"help": "<circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M9.5 9a2.5 2.5 0 1 1 3.2 2.4c-.8.3-1.2.8-1.2 1.6V14\"/><path d=\"M12 17h.01\"/>",
 "bell": "<path d=\"M6 16V11a6 6 0 0 1 12 0v5l2 2H4z\"/><path d=\"M10 21h4\"/>",
 "flag": "<path d=\"M5 21V4M5 4h11l-2 4 2 4H5\"/>"
 }
