@@ -1,4 +1,4 @@
-import { billCycleKey, cycleKeyOf, cycleRange, diffDays, addDays, shiftKey, parts, ds, monthLen, addMonthsDate, type Naming } from './cycle'
+import { billCycleKey, cycleKeyOf, cycleRange, diffDays, addDays, shiftKey, parts, ds, monthLen, addMonthsDate, type Naming } from './cycle.ts'
 export type DBx = any
 export interface CardBill { card: any; due: string; amount: number; manual: number; items: any[] }
 
@@ -62,12 +62,14 @@ export function cycleData(db: DBx, key: string, today: string) {
   const payOuts = outs.filter((t: any) => noSpend.has(t.category_id))
   const manual = db.manualBills.filter((b: any) => billCycleKey(b.due_date, N) === key)
   const paid = db.fixedPaid.filter((p: any) => p.cycle_key === key)
+  const inCycleFixed = fixedInCycle(db.fixed, key)
   const fixedById = Object.fromEntries(db.fixed.map((f: any) => [f.id, f]))
   const sum = (a: any[], f = (x: any) => Number(x.amount)) => a.reduce((s, x) => s + f(x), 0)
   const entradas = sum(ins)
   const cardOut = sum(spendOuts.filter((t: any) => t.payment === 'credito'))
   const manualOut = sum(manual)
-  const fixedOut = sum(paid)
+  const inCyclePaid = paid.filter((p: any) => inCycleFixed.some((f: any) => f.id === p.fixed_id))
+  const fixedOut = sum(inCyclePaid)
   const odPending = (db.overdraft || []).filter((o: any) => Number(o.used_amount) > 0 && cycleKeyOf(overdraftPayDate(o, today, S), S) === key).map((o: any) => ({ ...o, payDate: overdraftPayDate(o, today, S), amount: Number(o.used_amount) }))
   const odOut = sum(odPending)
   const loanInst = (db.loans || []).flatMap(loanInstallments)
@@ -77,7 +79,7 @@ export function cycleData(db: DBx, key: string, today: string) {
   const loanPaidOut = sum(loanPaid)
   const pendingLoanSum = sum(loanPending)
   const saidas = sum(spendOuts) + manualOut + fixedOut + odOut + loanPaidOut
-  const pendingFixed = db.fixed.filter((f: any) => !paid.find((p: any) => p.fixed_id === f.id))
+  const pendingFixed = inCycleFixed.filter((f: any) => !paid.find((p: any) => p.fixed_id === f.id))
   const pendingFixedSum = sum(pendingFixed)
   const byCat: Record<string, number> = {}
   spendOuts.forEach((t: any) => { const k = t.category_id || 'none'; byCat[k] = (byCat[k] || 0) + Number(t.amount) })
@@ -182,7 +184,7 @@ export function nextSummary(db: DBx, key: string, today: string) {
   const byCard: Record<string, { card: any; amount: number; due: string }> = {}
   cd.bills.forEach((b) => { const x = (byCard[b.card.id] = byCard[b.card.id] || { card: b.card, amount: 0, due: b.due }); x.amount += b.amount })
   const faturas = cd.bills.reduce((a, b) => a + b.amount, 0)
-  const fixos = db.fixed.reduce((a: number, f: any) => a + Number(f.amount), 0)
+  const fixos = fixedInCycle(db.fixed, nk).reduce((a: number, f: any) => a + Number(f.amount), 0)
   const cheque = cd.odOut
   const salarios = cd.incomeRows.filter((r: any) => r.source.is_salary).map((r: any) => ({ name: r.source.name, expected: r.expected, adv: r.adv, net: r.net }))
   const entradas = salarios.reduce((a: number, s: any) => a + s.expected, 0)
@@ -191,9 +193,14 @@ export function nextSummary(db: DBx, key: string, today: string) {
   return { key: nk, cards: Object.values(byCard), faturas, fixos, cheque, outrasJa, salarios, entradas, comprometido, sobra: entradas - comprometido }
 }
 
-/** Categoria "Combustível" (nome, sem acento, minúsculas). */
+/** Categoria de combustível: "Gasolina" ou "Combustível" (nome, sem acento, minúsculas). */
 export function isFuelCat(c: any) {
-  return !!c && String(c.name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') === 'combustivel'
+  const n = String(c?.name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  return n === 'gasolina' || n === 'combustivel'
+}
+/** Fixos que valem neste ciclo: os de todo mês e os "só este mês" deste ciclo. */
+export function fixedInCycle(fixed: any[] | undefined, key: string) {
+  return (fixed || []).filter((f: any) => !f.only_cycle || f.only_cycle === key)
 }
 export function fuelCatId(db: any) { return db?.categories?.find((c: any) => isFuelCat(c))?.id || null }
 /** Totais de combustível do ciclo, separados por moto e carro. */

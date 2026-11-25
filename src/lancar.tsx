@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom'
 import { useMemo, useState } from 'react'
 import { useData } from './data'
 import { Icon } from './icons'
@@ -24,6 +25,7 @@ export interface LancarInit { mode?: 'saida' | 'entrada'; sourceId?: string; amo
 export const openLancar = (init?: LancarInit) => window.dispatchEvent(new CustomEvent('tp:open', { detail: { lancar: init || {} } }))
 export const openVoz = () => window.dispatchEvent(new CustomEvent('tp:open', { detail: { voz: true } }))
 export function Lancar({ onClose, init }: { onClose: () => void; init?: LancarInit }) {
+  const nav = useNavigate()
   const ctx = useData(); const { db, today, naming, startDay, ins, toast } = ctx
   const [mode, setMode] = useState<'saida' | 'entrada'>(init?.mode || 'saida')
   const [text, setText] = useState(init?.text || '')
@@ -108,6 +110,7 @@ export function Lancar({ onClose, init }: { onClose: () => void; init?: LancarIn
     </div>}
     {mode === 'entrada' && advance && <div className="note acc"><Icon n="info" /><div className="d">Fica como <b>{source?.name} – adiantamento</b> no ciclo do próximo salário ({cycleName(txCycleKey({ kind: 'entrada', is_advance: true, date }, startDay, naming), naming)}), junto com as faturas que ele paga. O que falta receber do salário cai sozinho.</div></div>}
     <button type="button" className="btn" disabled={busy} onClick={save}>{busy ? 'Salvando…' : mode === 'saida' ? 'Salvar gasto' : 'Salvar entrada'}</button>
+    <button type="button" className="btn l" style={{ width: '100%', marginTop: 8 }} onClick={() => { onClose(); nav('/dinheiro/posso-comprar') }}>Posso comprar?</button>
   </Sheet>
 }
 

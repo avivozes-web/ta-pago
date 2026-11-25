@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useData } from '../data'
 import { Icon } from '../icons'
 import { Header, CycleBanner, Seg, DIN, Ic, Note } from '../ui'
-import { cashFlow, nextSummary, type FlowEv } from '../lib/calc'
+import { cashFlow, nextSummary, fixedInCycle, type FlowEv } from '../lib/calc'
 import { brl, ddmm, DOW } from '../lib/fmt'
 import { cycleName, dow, cycleRange } from '../lib/cycle'
 
@@ -57,7 +57,7 @@ export default function Fluxo() {
           {[['Salários previstos', ns.entradas, true, ns.salarios.map((s: any) => `${s.name.replace('Salário ', '')} ${brl(s.expected, false)}`).join(' · ') || 'coloque os valores em Extrato'],
             ...ns.cards.map((c: any) => [`Fatura ${c.card.name}`, -c.amount, false, `vence ${ddmm(c.due)}`]),
             ...(ns.cards.length ? [] : [['Faturas dos cartões', 0, false, 'nada lançado ainda']]),
-            ['Fixos', -ns.fixos, false, `${db!.fixed.length} contas`],
+            ['Fixos', -ns.fixos, false, `${fixedInCycle(db!.fixed, ns.key).length} contas`],
             ...(ns.cheque ? [['Cheque especial', -ns.cheque, false, 'usado, a pagar']] : []),
             ...(ns.outrasJa ? [['Outros gastos já marcados', -ns.outrasJa, false, '']] : []),
           ].map(([t, v, pos, d]: any) => <div key={t} className="row" style={{ padding: '7px 0', borderTop: '1px solid rgba(255,255,255,.07)', fontSize: 12.5 }}><div><div>{t}</div>{d && <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,.5)' }}>{d}</div>}</div><b className="sp n" style={{ fontWeight: 600, color: pos ? '#3FD1A9' : undefined }}>{pos ? '+ ' : '− '}{brl(Math.abs(v))}</b></div>)}

@@ -123,6 +123,11 @@ export default function Ajustes() {
         <Sr icon="sun" t="Hábitos e rotinas" d={`manhã ${manha} · noite ${noite}`} v={db!.habits.length} onClick={() => nav('/eu/habitos')} />
         <Sr icon="heart" t="Wishlist" d="categorias e desejos" v={db!.wishCats.length} onClick={() => nav('/eu/wishlist')} />
       </div>
+      <div className="sec">Posso comprar?</div>
+      <div className="card" style={{ padding: '2px 14px' }}>
+        <div className="li tap" onClick={() => setForm({ title: 'Regra de comprometimento', initial: { p: hh.buy_rule_pct ?? 90 }, fields: [{ k: 'p', label: 'Até quantos % da renda', type: 'number', required: true, min: 1, max: 100, hint: 'Se a soma dos compromissos com a nova compra passar disso, o app diz “eu não compraria agora”.' }], onSave: (v) => updHH({ buy_rule_pct: v.p }) })}><Ic n="target" /><div><div className="t">Regra dos {Number(hh.buy_rule_pct ?? 90)}%</div><div className="d">teto do comprometido no “Posso comprar?”</div></div><span className="sp lbl n" style={{ color: 'var(--ink2)' }}>{Number(hh.buy_rule_pct ?? 90)}%</span><span style={{ color: 'var(--mut2)' }}><Icon n="right" s={16} /></span></div>
+        <div className="li tap" onClick={() => setForm({ title: 'Juros do “Não sei”', initial: { p: hh.buy_interest_pct ?? 3 }, fields: [{ k: 'p', label: '% ao mês', type: 'number', required: true, min: 0, max: 20, hint: 'Quando você não sabe se a compra parcelada tem juros, o app usa esta taxa para estimar o total.' }], onSave: (v) => updHH({ buy_interest_pct: v.p }) })}><Ic n="card" /><div><div className="t">Juros quando não sei</div><div className="d">usado no “Posso comprar?” · padrão 3% ao mês</div></div><span className="sp lbl n" style={{ color: 'var(--ink2)' }}>{Number(hh.buy_interest_pct ?? 3)}% a.m.</span><span style={{ color: 'var(--mut2)' }}><Icon n="right" s={16} /></span></div>
+      </div>
       <div className="sec">Conta</div>
       <div className="card" style={{ padding: '2px 14px' }}>
         <Sr icon="dl" t="Exportar dados" d="planilha CSV dos lançamentos" onClick={exportCsv} />

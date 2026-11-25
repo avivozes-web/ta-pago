@@ -11,6 +11,7 @@ import Fluxo from './pages/Fluxo'
 import Cartoes from './pages/Cartoes'
 import Metas from './pages/Metas'
 import Investir from './pages/Investir'
+import PossoComprar from './pages/PossoComprar'
 import Wishlist from './pages/Wishlist'
 import Compras from './pages/Compras'
 import Habitos from './pages/Habitos'
@@ -48,6 +49,7 @@ function Shell() {
       <Route path="/dinheiro/cartoes" element={<Cartoes />} />
       <Route path="/dinheiro/metas" element={<Metas />} />
       <Route path="/dinheiro/investir" element={<Investir />} />
+      <Route path="/dinheiro/posso-comprar" element={<PossoComprar />} />
       <Route path="/casa/compras" element={<Compras />} />
       <Route path="/casa/tarefas" element={<Tarefas />} />
       <Route path="/eu/habitos" element={<Habitos />} />

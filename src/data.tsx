@@ -6,11 +6,11 @@ export const TABLES = {
   categories: 'tp_categories', keywords: 'tp_keywords', cards: 'tp_cards', income: 'tp_income_sources', investGoals: 'tp_invest_goals',
   tx: 'tp_transactions', manualBills: 'tp_manual_bills', fixed: 'tp_fixed', fixedPaid: 'tp_fixed_paid', wishCats: 'tp_wish_categories',
   wish: 'tp_wishlist', shopSections: 'tp_shop_sections', shopItems: 'tp_shop_items', shopChecks: 'tp_shop_checks', habits: 'tp_habits',
-  habitLogs: 'tp_habit_logs', tasks: 'tp_tasks', taskDone: 'tp_task_done', overdraft: 'tp_overdraft', loans: 'tp_loans',
+  habitLogs: 'tp_habit_logs', tasks: 'tp_tasks', taskDone: 'tp_task_done', overdraft: 'tp_overdraft', loans: 'tp_loans', monthGoals: 'tp_month_goals',
 } as const
 export type TKey = keyof typeof TABLES
 export type DB = { [K in TKey]: any[] } & { hh: any }
-const ORDER: Partial<Record<TKey, string>> = { categories: 'sort', cards: 'sort', income: 'sort', investGoals: 'sort', fixed: 'sort', wishCats: 'sort', wish: 'sort', shopSections: 'sort', shopItems: 'sort', habits: 'sort', tasks: 'sort', tx: 'date', overdraft: 'sort', loans: 'sort' }
+const ORDER: Partial<Record<TKey, string>> = { categories: 'sort', cards: 'sort', income: 'sort', investGoals: 'sort', fixed: 'sort', wishCats: 'sort', wish: 'sort', shopSections: 'sort', shopItems: 'sort', habits: 'sort', tasks: 'sort', tx: 'date', overdraft: 'sort', loans: 'sort', monthGoals: 'sort' }
 
 interface Ctx {
   db: DB | null; loading: boolean; error: string | null; today: string; currentKey: string; key: string; setKey: (k: string) => void
