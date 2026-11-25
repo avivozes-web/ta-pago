@@ -7,7 +7,7 @@ import { installmentDues, splitInstallments, dow, parts, addDays, cycleName, bil
 import { brl, ddmm, PAY_LABEL } from './lib/fmt'
 import { sb } from './lib/sb'
 import { occurs } from './pages/Tarefas'
-import { isFuelCat } from './lib/calc'
+import { needsVehicle } from './lib/calc'
 
 const SR: any = typeof window !== 'undefined' ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition : null
 const FQ: Record<string, string> = { diaria: 'Todo dia', semanal: 'Toda semana', quinzenal: 'A cada 15 dias', mensal: 'Todo mês', urgente: 'Urgente' }
@@ -19,7 +19,7 @@ function missing(i: VItem, db: any): string | null {
   switch (i.kind) {
     case 'gasto': {
       const cat = db.categories.find((c: any) => c.id === i.categoryId)
-      return !i.description ? 'falta o que foi' : !(i.amount! > 0) ? 'falta o valor' : !i.payment ? 'falta a forma de pagamento' : i.payment === 'credito' && !i.cardId ? 'falta o cartão' : isFuelCat(cat) && i.vehicle !== 'moto' && i.vehicle !== 'carro' ? 'moto ou carro?' : null
+      return !i.description ? 'falta o que foi' : !(i.amount! > 0) ? 'falta o valor' : !i.payment ? 'falta a forma de pagamento' : i.payment === 'credito' && !i.cardId ? 'falta o cartão' : needsVehicle(cat, i.description, i.text) && i.vehicle !== 'moto' && i.vehicle !== 'carro' ? 'moto ou carro?' : null
     }
     case 'fatura': return !i.cardId ? 'falta o cartão' : !(i.amount! > 0) ? 'falta o valor' : !i.due ? 'falta o mês' : null
     case 'wish': return !(i.amount! > 0) ? 'falta o valor' : null
@@ -75,7 +75,7 @@ export function Voz({ onClose }: { onClose: () => void }) {
       { k: 'vehicle', label: 'Moto ou carro?', type: 'ops', options: [{ v: 'moto', l: 'Moto' }, { v: 'carro', l: 'Carro' }] },
       { k: 'payment', label: 'Pagamento', type: 'ops', options: ['dinheiro', 'pix', 'debito', 'credito'].map((v) => ({ v, l: PAY_LABEL[v] })) },
       { k: 'cardId', label: 'Cartão', type: 'select', options: cardOpts }, { k: 'installments', label: 'Parcelas', type: 'number', min: 1, max: 48 }, { k: 'date', label: 'Data', type: 'date', required: true }],
-      show: (v) => ({ cardId: v.payment === 'credito', installments: v.payment === 'credito', vehicle: isFuelCat(db!.categories.find((c: any) => c.id === v.categoryId)) }),
+      show: (v) => ({ cardId: v.payment === 'credito', installments: v.payment === 'credito', vehicle: needsVehicle(db!.categories.find((c: any) => c.id === v.categoryId), v.description) }),
       onSave: (v) => done({ description: v.description, amount: v.amount, categoryId: v.categoryId || null, payment: v.payment || null, cardId: v.cardId || null, installments: Math.max(1, Number(v.installments) || 1), date: v.date, vehicle: v.vehicle || null }) })
     if (it.kind === 'fatura') { const dues = Array.from({ length: 8 }, (_, k) => { const p = parts(today); const t = new Date(p.y, p.m - 1 + k, 1); return t }).map((t) => ({ y: t.getFullYear(), m: t.getMonth() + 1 }))
       return setForm({ title: 'Fatura do cartão', initial: { cardId: it.cardId || '', ym: it.due ? it.due.slice(0, 7) : '', amount: it.amount ?? '' }, fields: [
@@ -143,7 +143,7 @@ export function Voz({ onClose }: { onClose: () => void }) {
       {items.length === 0 && <div className="note warn"><Icon n="info" /><div className="d">Não achei nada. Volte e fale de novo.</div></div>}
       <div className="card" style={{ padding: '2px 14px', marginBottom: 10 }}>{items.map((it, i) => { const v = view(it, dbv, naming); const m = missing(it, db)
         return <div key={i} className="li vz" data-kind={it.kind}><Ic n={v.icon} style={it.kind === '?' ? { background: 'var(--negS)', color: 'var(--neg)' } : undefined} />
-          <div style={{ minWidth: 0, flex: 1 }}><div className="lbl" style={{ fontSize: 10.5, textTransform: 'uppercase', letterSpacing: 0.3 }}>{v.k}</div><div className="t">{v.t}</div><div className="d n">{v.d}</div>{m === 'moto ou carro?' ? <div className="row" style={{ gap: 5, marginTop: 6 }}>{(['moto', 'carro'] as const).map((x) => <button type="button" key={x} className="tag acc" onClick={() => setAt(i, { ...it, vehicle: x } as VItem)}>{x === 'moto' ? 'Moto' : 'Carro'}</button>)}</div> : m && <span className={'tag ' + (it.kind === '?' ? 'neg' : 'warn')} style={{ marginTop: 4 }}>{m}</span>}</div>
+          <div style={{ minWidth: 0, flex: 1 }}><div className="lbl" style={{ fontSize: 10.5, textTransform: 'uppercase', letterSpacing: 0.3 }}>{v.k}</div><div className="t">{v.t}</div><div className="d n">{v.d}</div>{it.kind === 'gasto' && needsVehicle(db!.categories.find((c: any) => c.id === it.categoryId), it.description, it.text) && it.vehicle !== 'moto' && it.vehicle !== 'carro' && <div className="row" style={{ gap: 5, marginTop: 6 }}>{(['moto', 'carro'] as const).map((x) => <button type="button" key={x} className="tag acc" onClick={() => setAt(i, { ...it, vehicle: x } as VItem)}>{x === 'moto' ? 'Moto' : 'Carro'}</button>)}</div>}{m && m !== 'moto ou carro?' && <span className={'tag ' + (it.kind === '?' ? 'neg' : 'warn')} style={{ marginTop: 4 }}>{m}</span>}</div>
           <button type="button" className="ib" style={{ width: 32, height: 32 }} aria-label="editar" onClick={() => edit(i)}><Icon n="edit" s={15} /></button>
           <button type="button" className="ib" style={{ width: 32, height: 32 }} aria-label="remover" onClick={() => setAt(i, null)}><Icon n="x" s={15} /></button>
         </div> })}</div>

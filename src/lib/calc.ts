@@ -193,10 +193,20 @@ export function nextSummary(db: DBx, key: string, today: string) {
   return { key: nk, cards: Object.values(byCard), faturas, fixos, cheque, outrasJa, salarios, entradas, comprometido, sobra: entradas - comprometido }
 }
 
+function fold(s: string) { return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') }
 /** Categoria de combustível: "Gasolina" ou "Combustível" (nome, sem acento, minúsculas). */
 export function isFuelCat(c: any) {
-  const n = String(c?.name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  const n = fold(c?.name)
   return n === 'gasolina' || n === 'combustivel'
+}
+/** Texto de gasto/áudio com gasolina, combustível, abastecer ou posto (palavra inteira). */
+export function isFuelText(...parts: (string | null | undefined)[]) {
+  const n = fold(parts.filter(Boolean).join(' '))
+  return /(^|[^a-z0-9])(gasolina|combustivel|abastecer|posto)([^a-z0-9]|$)/.test(n)
+}
+/** Pede "Moto ou carro?" se a categoria se chama Gasolina/Combustível ou se o texto tem as palavras. */
+export function needsVehicle(cat?: any, ...texts: (string | null | undefined)[]) {
+  return isFuelCat(cat) || isFuelText(...texts)
 }
 /** Fixos que valem neste ciclo: os de todo mês e os "só este mês" deste ciclo. */
 export function fixedInCycle(fixed: any[] | undefined, key: string) {

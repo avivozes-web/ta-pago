@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useData } from '../data'
 import { Icon } from '../icons'
 import { Header, CycleBanner, Ic, Bar, catIcon, MACRO_COLOR, Empty } from '../ui'
-import { cycleData, billsDueSoon, paceSeries, cashFlow, nextSummary, isFuelCat, fuelSplit } from '../lib/calc'
+import { cycleData, billsDueSoon, paceSeries, cashFlow, nextSummary, fuelSplit } from '../lib/calc'
 import { brl, ddmm, PAY_LABEL } from '../lib/fmt'
 import { cycleName, shiftKey, diffDays, ds, parts, monthLen, addDays } from '../lib/cycle'
 import { TxEdit, openLancar, openVoz } from '../lancar'
@@ -62,7 +62,7 @@ export function CatPie({ db, cd, n = 7 }: any) {
       </svg>
       <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', textAlign: 'center', pointerEvents: 'none' }}><div><div className="lbl" style={{ fontSize: 10.5 }}>gasto</div><div className="n" style={{ fontWeight: 650, fontSize: 14 }}>{brl(tot, false)}</div></div></div>
     </div>
-    <div style={{ flex: 1, minWidth: 0 }}>{items.map((x) => { const cat = catBy[x.k]; const f = isFuelCat(cat) ? fuelSplit(cd.outs, x.k) : null; return <button type="button" key={x.k} onClick={() => go(x.k)} style={{ width: '100%', padding: '3.5px 0', fontSize: 12, textAlign: 'left' }}>
+    <div style={{ flex: 1, minWidth: 0 }}>{items.map((x) => { const cat = catBy[x.k]; const f = fuelSplit(cd.outs, x.k); return <button type="button" key={x.k} onClick={() => go(x.k)} style={{ width: '100%', padding: '3.5px 0', fontSize: 12, textAlign: 'left' }}>
       <div className="row" style={{ gap: 6 }}><span className="dot" style={{ background: x.color }} /><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{x.name}</span>
       <span className="sp n" style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{brl(x.v, false)}</span><span className="lbl n" style={{ width: 30, textAlign: 'right' }}>{Math.round((x.v / tot) * 100)}%</span></div>
       {f && (f.moto > 0 || f.carro > 0) && <div className="lbl n" style={{ paddingLeft: 16, marginTop: 1 }}>Moto {brl(f.moto, false)} · Carro {brl(f.carro, false)}</div>}

@@ -8,7 +8,7 @@ import { installmentDues, splitInstallments, cycleName, billCycleKey, addDays, t
 const defaultStart = (key: string, startDay: number) => { const { y, m } = keyParts(key); return ds(y, m, startDay) }
 import { brl, ddmm, moneyIn, moneyOut, PAY_LABEL } from './lib/fmt'
 import { sb } from './lib/sb'
-import { txCycleKey, isFuelCat } from './lib/calc'
+import { txCycleKey, needsVehicle } from './lib/calc'
 
 export async function learn(ctx: any, description: string, categoryId: string | null) {
   if (!categoryId) return
@@ -46,7 +46,8 @@ export function Lancar({ onClose, init }: { onClose: () => void; init?: LancarIn
   const installments = Math.max(1, Number(ov.installments ?? p.installments) || 1)
   const categoryId: string = ov.categoryId ?? guess?.category_id ?? ''
   const cat = db!.categories.find((c: any) => c.id === categoryId)
-  const vehicle: 'moto' | 'carro' | '' = isFuelCat(cat) ? (ov.vehicle || '') : ''
+  const askVehicle = needsVehicle(cat, description, text, init?.text, init?.quick?.description)
+  const vehicle: 'moto' | 'carro' | '' = askVehicle ? (ov.vehicle || '') : ''
   const card = cards.find((c: any) => c.id === cardId)
   const dues = payment === 'credito' && card ? installmentDues(date, card.closing_day, card.due_day, installments) : []
   const parts = amount ? splitInstallments(amount, installments) : []
@@ -67,7 +68,7 @@ export function Lancar({ onClose, init }: { onClose: () => void; init?: LancarIn
       if (!description) return toast('Escreva o que foi')
       if (!payment) return toast('Escolha a forma de pagamento')
       if (payment === 'credito' && !card) return toast('Escolha o cartão')
-      if (isFuelCat(cat) && vehicle !== 'moto' && vehicle !== 'carro') return toast('Escolha: moto ou carro?')
+      if (askVehicle && vehicle !== 'moto' && vehicle !== 'carro') return toast('Escolha: moto ou carro?')
       const veh = vehicle || null
       if (payment === 'credito') {
         const g = uuid()
@@ -96,7 +97,7 @@ export function Lancar({ onClose, init }: { onClose: () => void; init?: LancarIn
       <Row k="Valor"><div className="row" style={{ gap: 6 }}><input {...inp} autoFocus={!!init?.quick} aria-label="valor" inputMode="decimal" value={amountStr} placeholder="0,00" onChange={(e) => set('amount', e.target.value)} />{payment === 'credito' && installments > 1 && amount ? <span className="tag n">{installments}x de {brl(parts[parts.length - 1])}</span> : null}</div></Row>
       {mode === 'saida' && <Row k="Categoria"><select {...inp} value={categoryId} onChange={(e) => set('categoryId', e.target.value)}><option value="">Escolha…</option>{db!.categories.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
         <div className="row" style={{ gap: 5, marginTop: 4, flexWrap: 'wrap' }}>{cat && <span className="tag">{MACRO_LABEL[cat.macro]}</span>}{guess && guess.category_id === categoryId && <span className="tag acc"><Icon n="check" /> palavra {guess.learned ? 'aprendida' : 'conhecida'}: "{guess.word}"</span>}{categoryId && (!guess || guess.category_id !== categoryId) && description && <span className="tag">vou aprender "{learnWord(description)}"</span>}</div></Row>}
-      {mode === 'saida' && isFuelCat(cat) && <Row k="Veículo"><div className="row" style={{ gap: 5 }}>{(['moto', 'carro'] as const).map((x) => <button type="button" key={x} className={'op' + (vehicle === x ? ' on' : '')} style={{ padding: '7px 12px', fontSize: 12, textTransform: 'capitalize' }} onClick={() => set('vehicle', x)}>{x === 'moto' ? 'Moto' : 'Carro'}</button>)}</div>
+      {mode === 'saida' && askVehicle && <Row k="Veículo"><div className="row" style={{ gap: 5 }}>{(['moto', 'carro'] as const).map((x) => <button type="button" key={x} className={'op' + (vehicle === x ? ' on' : '')} style={{ padding: '7px 12px', fontSize: 12, textTransform: 'capitalize' }} onClick={() => set('vehicle', x)}>{x === 'moto' ? 'Moto' : 'Carro'}</button>)}</div>
         <div className="lbl" style={{ marginTop: 4 }}>Obrigatório. Depois dá para ver o total de cada um.</div></Row>}
       <Row k="Data"><input {...inp} type="date" value={date} onChange={(e) => set('date', e.target.value)} /></Row>
       <Row k="Pagamento"><div className="row" style={{ gap: 5 }}>{(mode === 'saida' ? ['dinheiro', 'pix', 'debito', 'credito'] : ['pix', 'dinheiro']).map((x) => <button type="button" key={x} className={'op' + ((payment || (mode === 'entrada' ? 'pix' : '')) === x ? ' on' : '')} style={{ padding: '7px 2px', fontSize: 12 }} onClick={() => set('payment', x)}>{PAY_LABEL[x]}</button>)}</div></Row>
@@ -137,7 +138,7 @@ export function TxEdit({ t, onClose }: { t: any; onClose: () => void }) {
   ]
   const initial = { ...t, amount: isCredit ? Number(t.total_amount ?? t.amount) : Number(t.amount), installments: t.installments || 1, card_id: t.card_id || '', vehicle: t.vehicle || '' }
   return <FormSheet title={t.kind === 'entrada' ? 'Editar entrada' : 'Editar gasto'} fields={fields} initial={initial} onClose={onClose}
-    show={(v) => ({ card_id: v.payment === 'credito', installments: v.payment === 'credito', vehicle: isFuelCat(db!.categories.find((c: any) => c.id === v.category_id)) })}
+    show={(v) => ({ card_id: v.payment === 'credito', installments: v.payment === 'credito', vehicle: needsVehicle(db!.categories.find((c: any) => c.id === v.category_id), v.description) })}
     onDelete={async () => {
       if (group.length > 1) { const ids = group.map((x: any) => x.id); const { error } = await sb.from('tp_transactions').delete().in('id', ids); if (error) toast(error.message); await reload('tx') }
       else await del('tx', t.id)
@@ -151,16 +152,16 @@ export function TxEdit({ t, onClose }: { t: any; onClose: () => void }) {
         const dues = installmentDues(v.date, card.closing_day, card.due_day, n); const parts = splitInstallments(v.amount, n)
         const ids = group.map((x: any) => x.id)
         const g = t.group_id || uuid()
-        const veh = isFuelCat(db!.categories.find((c: any) => c.id === v.category_id)) ? (v.vehicle || null) : null
-        if (isFuelCat(db!.categories.find((c: any) => c.id === v.category_id)) && veh !== 'moto' && veh !== 'carro') { toast('Escolha: moto ou carro?'); return false }
+        const veh = needsVehicle(db!.categories.find((c: any) => c.id === v.category_id), v.description) ? (v.vehicle || null) : null
+        if (needsVehicle(db!.categories.find((c: any) => c.id === v.category_id), v.description) && veh !== 'moto' && veh !== 'carro') { toast('Escolha: moto ou carro?'); return false }
         const r = await ins('tx', dues.map((due, i) => ({ kind: 'saida', description: v.description, amount: parts[i], date: v.date, category_id: v.category_id || null, payment: 'credito', card_id: card.id, bill_due: due, installment_no: i + 1, installments: n, group_id: g, total_amount: v.amount, created_by: t.created_by, vehicle: veh })))
         if (!r) return false
         const { error } = await sb.from('tp_transactions').delete().in('id', ids); if (error) toast(error.message)
         await reload('tx')
       } else {
         if (group.length > 1) { await sb.from('tp_transactions').delete().in('id', group.filter((x: any) => x.id !== t.id).map((x: any) => x.id)) }
-        const veh = isFuelCat(db!.categories.find((c: any) => c.id === v.category_id)) ? (v.vehicle || null) : null
-        if (isFuelCat(db!.categories.find((c: any) => c.id === v.category_id)) && veh !== 'moto' && veh !== 'carro') { toast('Escolha: moto ou carro?'); return false }
+        const veh = needsVehicle(db!.categories.find((c: any) => c.id === v.category_id), v.description) ? (v.vehicle || null) : null
+        if (needsVehicle(db!.categories.find((c: any) => c.id === v.category_id), v.description) && veh !== 'moto' && veh !== 'carro') { toast('Escolha: moto ou carro?'); return false }
         const ok = await upd('tx', t.id, { description: v.description, amount: v.amount, date: v.date, category_id: v.category_id || null, payment: v.payment, card_id: null, bill_due: null, installment_no: null, installments: null, group_id: null, total_amount: null, vehicle: veh })
         if (!ok) return false
         await reload('tx')

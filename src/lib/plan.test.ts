@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { setCycleStarts } from './cycle.ts'
-import { isFuelCat, fixedInCycle } from './calc.ts'
+import { isFuelCat, isFuelText, needsVehicle, fixedInCycle } from './calc.ts'
 import { pmt, installmentOf, incomeOf, committedOf, analyzeBuy, verdictText, leftoverAfterLiveEnjoy, projection, parseMonthGoal, monthGoalDone, r2 } from './plan.ts'
 
 test('Gasolina e Combustível são categoria de combustível', () => {
@@ -10,6 +10,21 @@ test('Gasolina e Combustível são categoria de combustível', () => {
   assert.equal(isFuelCat({ name: 'Combustível' }), true)
   assert.equal(isFuelCat({ name: 'COMBUSTIVEL' }), true)
   assert.equal(isFuelCat({ name: 'Uber' }), false)
+  assert.equal(isFuelCat({ name: 'Transporte' }), false)
+})
+test('palavras gasolina/combustível/abastecer/posto pedem moto ou carro', () => {
+  assert.equal(isFuelText('gasolina 50'), true)
+  assert.equal(isFuelText('Gasolina'), true)
+  assert.equal(isFuelText('abastecer no posto'), true)
+  assert.equal(isFuelText('Combustível 80'), true)
+  assert.equal(isFuelText('combustivel'), true)
+  assert.equal(isFuelText('uber 18'), false)
+  assert.equal(isFuelText('imposto 200'), false)
+  assert.equal(isFuelText('depósito'), false)
+  const transporte = { name: 'Transporte' }
+  assert.equal(needsVehicle(transporte, 'gasolina 50'), true)
+  assert.equal(needsVehicle(transporte, 'uber 18'), false)
+  assert.equal(needsVehicle({ name: 'Gasolina' }, 'qualquer coisa'), true)
 })
 
 test('fixo só deste mês aparece só naquele ciclo', () => {
